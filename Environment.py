@@ -33,6 +33,17 @@ class DecisionRule(Enum):
     DETERMINISTIC = 1
 
 
+def NaiveBayesOneIter(prior, signal, bucket_no, pr_rs_ru, pr_rs_bu):
+    posterior = np.array(prior)
+    if signal.name == 'RED':
+        posterior[bucket_no] = prior[bucket_no] * pr_rs_ru / (
+                    prior[bucket_no] * pr_rs_ru + (1 - prior[bucket_no]) * pr_rs_bu)
+    else:
+        posterior[bucket_no] = prior[bucket_no] * (1 - pr_rs_ru) / (
+                    prior[bucket_no] * (1 - pr_rs_ru) + (1 - prior[bucket_no]) * (1 - pr_rs_bu))
+
+    return posterior
+
 class PredictionMarket:
 
     def __init__(self, no, prior_red):

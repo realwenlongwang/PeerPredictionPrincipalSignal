@@ -43,14 +43,16 @@ def stochastic_training_notebook(agent_list, learning_rate_theta, learning_rate_
             agent_list.append(agent)
 
     system_accumulated_reward = 0
+    system_accumulated_loss = 0
 
     for t in tnrange(training_episodes):
-        system_reward = stochastic_iterative_policy(action_num, prior_red_list, pr_red_ball_red_bucket,
+        system_reward, system_loss = stochastic_iterative_policy(action_num, prior_red_list, pr_red_ball_red_bucket,
                                                     pr_red_ball_blue_bucket, agent_list, t, decay_rate, score_func,
                                                     decision_rule, preferred_colour_pr_list)
         system_accumulated_reward += system_reward
+        system_accumulated_loss += system_loss
 
-    return system_accumulated_reward
+    return system_accumulated_reward, system_accumulated_loss
 
 
 def stochastic_training(learning_rate_theta, learning_rate_wv,
@@ -71,14 +73,16 @@ def stochastic_training(learning_rate_theta, learning_rate_wv,
         agent_list.append(agent)
 
     system_accumulated_reward = 0
+    system_accumulated_loss = 0
 
     for t in trange(training_episodes):
-        system_reward = stochastic_iterative_policy(action_num, prior_red_list, pr_red_ball_red_bucket,
+        system_reward, system_loss = stochastic_iterative_policy(action_num, prior_red_list, pr_red_ball_red_bucket,
                                                     pr_red_ball_blue_bucket, agent_list, t, decay_rate, score_func,
                                                     decision_rule, preferred_colour_pr_list)
         system_accumulated_reward += system_reward
+        system_accumulated_loss += system_loss
 
-    return agent_list, system_accumulated_reward
+    return agent_list, system_accumulated_reward, system_accumulated_loss
 
 
 def stochastic_iterative_policy(action_num, prior_red_list, pr_red_ball_red_bucket, pr_red_ball_blue_bucket, agent_list,
@@ -97,14 +101,16 @@ def stochastic_iterative_policy(action_num, prior_red_list, pr_red_ball_red_buck
 
     experience_list = []
 
-
+    nb_predictions = dm.read_current_pred()
     for agent in agent_list:
         bucket_no, ball_colour = buckets.signal()
-        signal_array, h_array, mean_array, std_array = agent.report(bucket_no, ball_colour, dm.read_current_pred(), t)
+        current_predictions = dm.read_current_pred()
+        signal_array, h_array, mean_array, std_array = agent.report(bucket_no, ball_colour, current_predictions, t)
         pi_array = expit(h_array)
         mean_predictions = expit(mean_array)
         dm.report(pi_array, mean_predictions)
         experience_list.append([t, signal_array.copy(), h_array.copy(), mean_array.copy(), std_array.copy()])
+        nb_predictions = NaiveBayesOneIter(nb_predictions, ball_colour, bucket_no, pr_red_ball_red_bucket, pr_red_ball_blue_bucket)
 
     rewards_array, arm = dm.log_resolve(buckets.bucket_list)
 
@@ -121,7 +127,9 @@ def stochastic_iterative_policy(action_num, prior_red_list, pr_red_ball_red_buck
 
         agent.learning_rate_decay(epoch=t, decay_rate=decay_rate)
 
-    return buckets.bucket_list[arm].colour == BucketColour.RED
+    final_predictions = dm.read_current_pred()
+    loss = np.sum(np.square(nb_predictions - final_predictions))
+    return buckets.bucket_list[arm].colour == BucketColour.RED, loss
 
 
 def deterministic_training_notebook(
