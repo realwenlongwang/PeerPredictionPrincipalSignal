@@ -38,27 +38,28 @@ class PredictionMarket:
     def __init__(self, no, prior_red):
         self.no = no
         self.current_prediction = [prior_red, 1 - prior_red]
-        self.prediction_history = [self.current_prediction.copy()]
+        self.sampled_prediction_history = [self.current_prediction.copy()]
+        self.mean_prediction_history = [self.current_prediction.copy()]
 
 
-    def report(self, prediction):
-        assert sum(prediction) == 1, print('Probabilities not sum to one!', prediction)
+    def report(self, sampled_prediction, mean_prediction):
         # Record the contract if multiple traders.
-        self.prediction_history.append(prediction.copy())
-        self.current_prediction = prediction.copy()
+        self.sampled_prediction_history.append(sampled_prediction.copy())
+        self.mean_prediction_history.append(mean_prediction.copy())
+        self.current_prediction = mean_prediction.copy()
 
     def log_resolve(self, materialised_index):
         score_list = []
-        for i in range(len(self.prediction_history) - 1): # minus the initial report
-            scores = np.log(self.prediction_history[i+1]) - np.log(self.prediction_history[i])
+        for i in range(len(self.sampled_prediction_history) - 1): # minus the initial report
+            scores = np.log(self.sampled_prediction_history[i + 1]) - np.log(self.mean_prediction_history[i])
             score_list.append(scores.copy()[materialised_index])
         return np.array(score_list)
 
     def brier_resolve(self, materialised_index):
         score_list = []
-        for i in range(len(self.prediction_history) - 1):
-            current_scores = self.prediction_history[i+1][materialised_index] - np.sum(np.square(self.prediction_history[i+1])) / 2
-            previous_scores = self.prediction_history[i][materialised_index] - np.sum(np.square(self.prediction_history[i])) / 2
+        for i in range(len(self.sampled_prediction_history) - 1):
+            current_scores = self.sampled_prediction_history[i + 1][materialised_index] - np.sum(np.square(self.sampled_prediction_history[i + 1])) / 2
+            previous_scores = self.mean_prediction_history[i][materialised_index] - np.sum(np.square(self.mean_prediction_history[i])) / 2
             score_list.append(current_scores - previous_scores)
         return np.array(score_list)
 
@@ -81,16 +82,16 @@ class DecisionMarket:
         self.decision_rule = decision_rule
         self.preferred_colour_pr_list = preferred_colour_pr_list
 
-    def report(self, pi_array):
-        for pm, pi in zip(self.conditional_market_list, pi_array[0]):
-            pm.report([np.asscalar(pi), 1 - np.asscalar(pi)])
+    def report(self, sampled_predictions, mean_predictions):
+        for pm, pi, mu in zip(self.conditional_market_list, sampled_predictions[0], mean_predictions[0]):
+            pm.report([np.asscalar(pi), 1 - np.asscalar(pi)], [np.asscalar(mu), 1 - np.asscalar(mu)])
 
     def log_resolve(self, buckets):
         if self.decision_rule == DecisionRule.DETERMINISTIC:
             current_price_list = self.read_current_pred()
             index = np.argmax(current_price_list)
             conditional_market, bucket = self.conditional_market_list[index], buckets[index]
-            agent_num = len(conditional_market.prediction_history) - 1  # minus the initial report
+            agent_num = len(conditional_market.sampled_prediction_history) - 1  # minus the initial report
             reward_array = np.zeros(shape=(agent_num, self.conditional_market_num))
             reward_array[:, index] = conditional_market.log_resolve(bucket.colour.value)
             return reward_array, index
@@ -103,7 +104,7 @@ class DecisionMarket:
                                                       p=self.preferred_colour_pr_list)
             index = conditional_market.no
             bucket = buckets[index]
-            agent_num = len(conditional_market.prediction_history) - 1 # minus the initial report
+            agent_num = len(conditional_market.sampled_prediction_history) - 1 # minus the initial report
             reward_array = np.zeros(shape=(agent_num, self.conditional_market_num))
             reward_array[:, index] = conditional_market.log_resolve(bucket.colour.value) / pr
             return reward_array, index

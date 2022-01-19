@@ -351,26 +351,24 @@ class StochasticGradientAgent(Agent):
                                          columns=column_list)
         return reward_history_df
 
-    def reward_history_plot(self):
+    def reward_history_plot(self, top_margin=0.01, bottom_margin=0.005):
         reward_history_df = self.reward_history_dataframe()
         for bucket_no in range(self.action_num):
             fig, axs = plt.subplots(2, figsize=(15, 4 * 2))
             reward_column_name = 'bucket_' + str(bucket_no) + '_reward'
             v_column_name = 'bucket_' + str(bucket_no) + '_v'
+            running_average_reward = reward_history_df[reward_column_name].expanding().mean()
             axs[0].hlines(y=0.0, xmin=0, xmax=reward_history_df.shape[0], colors='black', linestyles='dashdot')
-            axs[0].plot(reward_history_df[v_column_name], label=v_column_name)
-            axs[0].plot(reward_history_df[reward_column_name].expanding().mean(), zorder=-99,
-                        label='Average ' + reward_column_name)
-            last_quarter_num = len(reward_history_df) // 4
-            axs[1].hlines(y=0.0, xmin=last_quarter_num, xmax=reward_history_df.shape[0], colors='black',
-                          linestyles='dashdot')
-            axs[1].plot(reward_history_df.tail(last_quarter_num)[v_column_name], label=v_column_name)
-            axs[1].plot(reward_history_df.tail(last_quarter_num)[reward_column_name].expanding().mean(), zorder=-99,
-                        label='Last Quarter Average ' + reward_column_name)
-            axs[1].annotate('%.3f' % reward_history_df.tail().mean(),
-                            xy=(len(reward_history_df), reward_history_df.tail().mean()),
-                            # xytext=(len(reward_history_df) / 2, np.log(2) / 2),
-                            arrowprops=dict(arrowstyle="->"))
+            axs[0].plot(reward_history_df[v_column_name], label=v_column_name, zorder=-100)
+            axs[0].plot(running_average_reward, zorder=-99, label='Average ' + reward_column_name)
+
+            last_quarter_num = 3 * len(reward_history_df) // 4
+            top = running_average_reward.iloc[-1] + top_margin
+            bottom = running_average_reward.iloc[-1] - bottom_margin
+            axs[1].plot(reward_history_df[v_column_name], zorder=-100)
+            axs[1].plot(running_average_reward, zorder=-99)
+            axs[1].set_xlim(left=last_quarter_num)
+            axs[1].set_ylim(top=top, bottom=bottom)
             fig.legend(loc='upper right')
             fig.suptitle(self.name + ' Reward History')
 

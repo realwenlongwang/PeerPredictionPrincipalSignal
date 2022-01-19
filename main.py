@@ -102,7 +102,8 @@ def stochastic_iterative_policy(action_num, prior_red_list, pr_red_ball_red_buck
         bucket_no, ball_colour = buckets.signal()
         signal_array, h_array, mean_array, std_array = agent.report(bucket_no, ball_colour, dm.read_current_pred(), t)
         pi_array = expit(h_array)
-        dm.report(pi_array)
+        mean_predictions = expit(mean_array)
+        dm.report(pi_array, mean_predictions)
         experience_list.append([t, signal_array.copy(), h_array.copy(), mean_array.copy(), std_array.copy()])
 
     rewards_array, arm = dm.log_resolve(buckets.bucket_list)
@@ -225,7 +226,8 @@ def deterministic_iterative_policy(action_num, prior_red_list, pr_red_ball_red_b
         explorer.set_parameters(mean_array=mean_array, fixed_std=fixed_std)
         e_h_array = explorer.report(signal_array)
         e_pi_array = expit(e_h_array)
-        dm.report(e_pi_array)
+        mean_predictions = expit(mean_array)
+        dm.report(e_pi_array, mean_predictions)
         experience_list.append([t, signal_array, e_h_array, mean_array])
 
     rewards_array, arm = dm.log_resolve(buckets.bucket_list)
