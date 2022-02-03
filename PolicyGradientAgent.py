@@ -13,8 +13,8 @@ def gaussian(x, mu, sigma):
 class Agent:
 
     def __init__(self, feature_num, action_num, learning_rate_theta, name, algorithm='regular'):
-        # self.theta_mean = np.zeros((feature_num * action_num, action_num))
-        self.theta_mean = np.random.uniform(low=-1.0, high=1.0, size=(feature_num * action_num, action_num))
+        self.theta_mean = np.zeros((feature_num * action_num, action_num))
+        # self.theta_mean = np.random.uniform(low=-1.0, high=1.0, size=(feature_num * action_num, action_num))
         # self.theta_mean = np.random.normal(0, np.sqrt(2/(feature_num * action_num)), (feature_num * action_num, action_num))
         # self.theta_mean = np.array([[0.0, -1.2], [0.0, -1.2], [0.0, 0.0], [-1.2, 0.0], [-1.2, 0.0], [0.0, 0.0]])
         self.init_learning_rate_theta = learning_rate_theta

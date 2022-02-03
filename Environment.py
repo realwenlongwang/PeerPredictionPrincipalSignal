@@ -120,6 +120,39 @@ class DecisionMarket:
             reward_array[:, index] = conditional_market.log_resolve(bucket.colour.value) / pr
             return reward_array, index
 
+    def brier_resolve(self, buckets):
+        if self.decision_rule == DecisionRule.DETERMINISTIC:
+            current_price_list = self.read_current_pred()
+            index = np.argmax(current_price_list)
+            conditional_market, bucket = self.conditional_market_list[index], buckets[index]
+            agent_num = len(conditional_market.sampled_prediction_history) - 1  # minus the initial report
+            reward_array = np.zeros(shape=(agent_num, self.conditional_market_num))
+            reward_array[:, index] = conditional_market.brier_resolve(bucket.colour.value)
+            return reward_array, index
+        else:
+            # TODO: consider move the generator initialisation outside and init once only. May speed up training.
+            generator = Generator(PCG64())
+            sorted_market_list = sorted(self.conditional_market_list, key=lambda market: market.current_prediction[0],
+                                        reverse=True)
+            pr, conditional_market = generator.choice(list(zip(self.preferred_colour_pr_list, sorted_market_list)),
+                                                      p=self.preferred_colour_pr_list)
+            index = conditional_market.no
+            bucket = buckets[index]
+            agent_num = len(conditional_market.sampled_prediction_history) - 1 # minus the initial report
+            reward_array = np.zeros(shape=(agent_num, self.conditional_market_num))
+            reward_array[:, index] = conditional_market.brier_resolve(bucket.colour.value) / pr
+            return reward_array, index
+
+    def resolve(self, score_func, buckets):
+        if score_func == ScoreFunction.LOG:
+            return self.log_resolve(buckets)
+        elif score_func == ScoreFunction.QUADRATIC:
+            return self.brier_resolve(buckets)
+        else:
+            raise ValueError('The score function does not exist.')
+
+
+
     def read_current_pred(self):
         current_price_list = list(pm.current_prediction[0] for pm in self.conditional_market_list)
 
@@ -156,12 +189,19 @@ class MultiBuckets:
         self.pr_red_ball_red_bucket = pr_red_ball_red_bucket
         self.pr_red_ball_blue_bucket = pr_red_ball_blue_bucket
         self.bucket_list = []
+        self.index = np.random.randint(bucket_num)
+        self.bucket_num = bucket_num
         for no, prior_red in zip(range(bucket_num), prior_red_instances):
             self.bucket_list.append(Bucket(no, prior_red, pr_red_ball_red_bucket, pr_red_ball_blue_bucket))
 
-    def signal(self):
+    def signal(self, t):
+
         # Randomly select a bucket
         bucket = np.random.choice(self.bucket_list)
+
+        # # Always select a different bucket for each agent
+        # bucket = self.bucket_list[self.index % self.bucket_num]
+        # self.index += 1
         return bucket.no, bucket.signal()
 
 
