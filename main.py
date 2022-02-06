@@ -13,7 +13,7 @@ def stochastic_training_notebook(agent_list, learning_rate_theta, learning_rate_
                                  decay_rate, beta1, beta2, algorithm, learning_std,
                                  fixed_std, pr_red_ball_red_bucket, pr_red_ball_blue_bucket,
                                  prior_red_list, agent_num, action_num, score_func, decision_rule,
-                                 preferred_colour_pr_list, evaluation_step):
+                                 preferred_colour_pr_list, evaluation_step, weights_init):
 
     if not agent_list:
         for i in range(agent_num):
@@ -21,7 +21,7 @@ def stochastic_training_notebook(agent_list, learning_rate_theta, learning_rate_
                                             learning_rate_theta=learning_rate_theta, learning_rate_wv=learning_rate_wv,
                                             memory_size=memory_size, batch_size=batch_size, beta1=beta1, beta2=beta2,
                                             learning_std=learning_std, fixed_std=fixed_std, name='agent' + str(i),
-                                            algorithm=algorithm)
+                                            algorithm=algorithm, weights_init=weights_init)
             agent.evaluation_init(pr_red_ball_red_bucket, pr_red_ball_blue_bucket, evaluation_step)
             agent_list.append(agent)
 
@@ -47,7 +47,7 @@ def stochastic_training(learning_rate_theta, learning_rate_wv,
                         decay_rate, beta1, beta2, algorithm, learning_std,
                         fixed_std, pr_red_ball_red_bucket, pr_red_ball_blue_bucket,
                         prior_red_list, agent_num, action_num, score_func, decision_rule,
-                        preferred_colour_pr_list, evaluation_step):
+                        preferred_colour_pr_list, evaluation_step, weight_init):
     agent_list = []
 
     for i in range(agent_num):
@@ -55,7 +55,7 @@ def stochastic_training(learning_rate_theta, learning_rate_wv,
                                         learning_rate_theta=learning_rate_theta, learning_rate_wv=learning_rate_wv,
                                         memory_size=memory_size, batch_size=batch_size, beta1=beta1, beta2=beta2,
                                         learning_std=learning_std, fixed_std=fixed_std, name='agent' + str(i),
-                                        algorithm=algorithm)
+                                        algorithm=algorithm, weights_init=weight_init)
         agent.evaluation_init(pr_red_ball_red_bucket, pr_red_ball_blue_bucket, evaluation_step)
         agent_list.append(agent)
 
@@ -85,9 +85,6 @@ def stochastic_iterative_policy(action_num, prior_red_list, pr_red_ball_red_buck
         prior_red_instances = np.random.choice(prior_red_list, size=action_num)
 
     buckets = MultiBuckets(action_num, prior_red_instances, pr_red_ball_red_bucket, pr_red_ball_blue_bucket)
-    # # test normal distribution effect
-    # prior_red_instances = expit(np.random.normal(loc=logit(prior_red_instances), scale=0.3))
-    # pm = PredictionMarket(0, prior_red=prior_red)
     dm = DecisionMarket(action_num, prior_red_instances, decision_rule, preferred_colour=BucketColour.RED,
                         preferred_colour_pr_list=preferred_colour_pr_list)
 
@@ -136,7 +133,7 @@ def deterministic_training_notebook(
         memory_size, batch_size, training_episodes,
         decay_rate, beta1, beta2, algorithm, pr_red_ball_red_bucket,
         pr_red_ball_blue_bucket, prior_red_list, agent_num, explorer_learning,
-        fixed_std, decision_rule, preferred_colour_pr_list, evaluation_step):
+        fixed_std, score_func, decision_rule, preferred_colour_pr_list, evaluation_step, weights_init):
 
     if not agent_list:
         for i in range(agent_num):
@@ -158,17 +155,23 @@ def deterministic_training_notebook(
     explorer = Explorer(feature_num=3, action_num=action_num, learning=explorer_learning, init_learning_rate=3e-4,
                         min_std=0.1)
 
-    system_accumulated_reward = 0
+    loss_list = []
+    dm_outcome_list = []
+    prior_outcome_list = []
+    nb_outcome_list = []
 
     for t in tnrange(training_episodes):
-        system_reward = deterministic_iterative_policy(
+        dm_outcome, prior_outcome, nb_outcome, loss = deterministic_iterative_policy(
             action_num, prior_red_list, pr_red_ball_red_bucket,
             pr_red_ball_blue_bucket, agent_list, explorer,
-            t, decay_rate, fixed_std, decision_rule, preferred_colour_pr_list
+            t, decay_rate, fixed_std, score_func, decision_rule, preferred_colour_pr_list
         )
-        system_accumulated_reward += system_reward
+        dm_outcome_list.append(dm_outcome)
+        prior_outcome_list.append(prior_outcome)
+        nb_outcome_list.append(nb_outcome)
+        loss_list.append(loss)
 
-    return system_accumulated_reward
+    return agent_list, dm_outcome_list, prior_outcome_list, nb_outcome_list, loss_list
 
 
 def deterministic_training(
@@ -177,41 +180,43 @@ def deterministic_training(
         memory_size, batch_size, training_episodes,
         decay_rate, beta1, beta2, algorithm, pr_red_ball_red_bucket,
         pr_red_ball_blue_bucket, prior_red_list, agent_num, explorer_learning,
-        fixed_std, decision_rule, preferred_colour_pr_list, evaluation_step):
+        fixed_std, score_func, decision_rule, preferred_colour_pr_list, evaluation_step, weight_init):
     agent_list = []
 
     for i in range(agent_num):
         agent = DeterministicGradientAgent(
-            feature_num=feature_num, action_num=action_num,
-            learning_rate_theta=learning_rate_theta,
-            learning_rate_wv=learning_rate_wv,
-            learning_rate_wq=learning_rate_wq,
-            memory_size=memory_size,
-            batch_size=batch_size,
-            beta1=beta1,
-            beta2=beta2,
-            name='agent' + str(i),
-            algorithm=algorithm
+            feature_num=feature_num, action_num=action_num, learning_rate_theta=learning_rate_theta,
+            learning_rate_wv=learning_rate_wv, learning_rate_wq=learning_rate_wq,
+            memory_size=memory_size, batch_size=batch_size,
+            beta1=beta1, beta2=beta2, name='agent' + str(i),
+            algorithm=algorithm, weights_init=weight_init
         )
         agent.evaluation_init(pr_red_ball_red_bucket, pr_red_ball_blue_bucket, evaluation_step)
         agent_list.append(agent)
 
+    loss_list = []
+    dm_outcome_list = []
+    prior_outcome_list = []
+    nb_outcome_list = []
+
     explorer = Explorer(feature_num=3, action_num=action_num, learning=explorer_learning, init_learning_rate=3e-4,
                         min_std=0.1)
 
-    system_accumulated_reward = 0
-
     for t in trange(training_episodes):
-        system_reward = deterministic_iterative_policy(
+        dm_outcome, prior_outcome, nb_outcome, loss = deterministic_iterative_policy(
             action_num, prior_red_list, pr_red_ball_red_bucket,
             pr_red_ball_blue_bucket, agent_list, explorer,
-            t, decay_rate, fixed_std, decision_rule, preferred_colour_pr_list
+            t, decay_rate, fixed_std, score_func, decision_rule, preferred_colour_pr_list
         )
-        system_accumulated_reward += system_reward
+        dm_outcome_list.append(dm_outcome)
+        prior_outcome_list.append(prior_outcome)
+        nb_outcome_list.append(nb_outcome)
+        loss_list.append(loss)
 
+    return agent_list, dm_outcome_list, prior_outcome_list, loss_list
 
 def deterministic_iterative_policy(action_num, prior_red_list, pr_red_ball_red_bucket, pr_red_ball_blue_bucket,
-                                   agent_list, explorer, t, decay_rate, fixed_std, decision_rule,
+                                   agent_list, explorer, t, decay_rate, fixed_std, score_func, decision_rule,
                                    preferred_colour_pr_list):
     if prior_red_list is None:
         prior_red_instances = np.random.uniform(size=action_num)
@@ -224,19 +229,21 @@ def deterministic_iterative_policy(action_num, prior_red_list, pr_red_ball_red_b
 
     experience_list = []
 
+    nb_predictions = dm.read_current_pred()
     for agent in agent_list:
-        bucket_no, ball_colour = buckets.signal()
-        signal_array, mean_array = agent.report(bucket_no, ball_colour, dm.read_current_pred())
-        # pi = expit(mean_array)
-        # actor_report = [pi, 1 - pi]
+        bucket_no, ball_colour = buckets.signal(t)
+        current_predictions = dm.read_current_pred()
+        signal_array, mean_array = agent.report(bucket_no, ball_colour, current_predictions, t)
         explorer.set_parameters(mean_array=mean_array, fixed_std=fixed_std)
         e_h_array = explorer.report(signal_array)
         e_pi_array = expit(e_h_array)
         mean_predictions = expit(mean_array)
         dm.report(e_pi_array, mean_predictions)
         experience_list.append([t, signal_array, e_h_array, mean_array])
+        nb_predictions = NaiveBayesOneIter(nb_predictions, ball_colour, bucket_no, pr_red_ball_red_bucket,
+                                           pr_red_ball_blue_bucket)
 
-    rewards_array, arm = dm.log_resolve(buckets.bucket_list)
+    rewards_array, arm = dm.resolve(score_func, buckets.bucket_list)
 
     # learning
     for agent, reward_array, experience in zip(agent_list, rewards_array, experience_list):
@@ -255,7 +262,15 @@ def deterministic_iterative_policy(action_num, prior_red_list, pr_red_ball_red_b
         #     if explorer.learning:
         #         explorer.learning_rate_decay(epoch=t, decay_rate=0.001)
 
-    return buckets.bucket_list[arm].colour == BucketColour.RED
+    final_predictions = dm.read_current_pred()
+    loss = np.sum(np.square(nb_predictions - final_predictions))
+    dm_outcome = buckets.bucket_list[arm].colour == BucketColour.RED
+    prior_arm = np.argmax(prior_red_instances)
+    prior_outcome = buckets.bucket_list[prior_arm].colour == BucketColour.RED
+    nb_arm = np.argmax(nb_predictions)
+    nb_outcome = buckets.bucket_list[nb_arm].colour == BucketColour.RED
+
+    return dm_outcome, prior_outcome, nb_outcome, loss
 
 
 if __name__ == '__main__':
@@ -268,7 +283,7 @@ if __name__ == '__main__':
     beta1 = 0.9
     beta2 = 0.9999
     # Algorithm: adam, momentum, regular
-    algorithm = 'regular'
+    algorithm = Algorithm.REGULAR
     learning_std = False
     fixed_std = 0.3
     # Bucket parameters
@@ -281,13 +296,14 @@ if __name__ == '__main__':
     score_func = ScoreFunction.LOG
     decision_rule = DecisionRule.DETERMINISTIC
     evaluation_step = 1
+    weights_init = WeightsInit.ZERO
 
     stochastic_training(learning_rate_theta, learning_rate_wv,
                         memory_size, batch_size, training_episodes,
                         decay_rate, beta1, beta2, algorithm, learning_std,
                         fixed_std, pr_red_ball_red_bucket, pr_red_ball_blue_bucket,
                         prior_red_list, agent_num, action_num, score_func, decision_rule,
-                        preferred_colour_pr_list, evaluation_step)
+                        preferred_colour_pr_list, evaluation_step, weights_init)
 
     # feature_num = 3
     # action_num = 2

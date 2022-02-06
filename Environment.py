@@ -18,9 +18,9 @@ class BucketColour(Enum):
 
 
 class Algorithm(Enum):
-    REGULAR = 0
-    MOMENTUM = 1
-    ADAM = 2
+    REGULAR = 'regular'
+    MOMENTUM = 'momentum'
+    ADAM = 'adam'
 
 
 class ScoreFunction(Enum):
@@ -31,6 +31,11 @@ class ScoreFunction(Enum):
 class DecisionRule(Enum):
     STOCHASTIC = 0
     DETERMINISTIC = 1
+
+class WeightsInit(Enum):
+    ZERO = 'zero initialisation'
+    RANDOM = 'random initialisation'
+
 
 
 def NaiveBayesOneIter(prior, signal, bucket_no, pr_rs_ru, pr_rs_bu):
