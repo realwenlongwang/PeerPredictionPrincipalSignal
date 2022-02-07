@@ -103,7 +103,7 @@ class DecisionMarket:
             pm.report([np.asscalar(pi), 1 - np.asscalar(pi)], [np.asscalar(mu), 1 - np.asscalar(mu)])
 
     def log_resolve(self, buckets):
-        if self.decision_rule == DecisionRule.DETERMINISTIC:
+        if self.decision_rule == DecisionRule.DETERMINISTIC or self.conditional_market_num == 1:
             current_price_list = self.read_current_pred()
             index = np.argmax(current_price_list)
             conditional_market, bucket = self.conditional_market_list[index], buckets[index]
@@ -126,7 +126,7 @@ class DecisionMarket:
             return reward_array, index
 
     def brier_resolve(self, buckets):
-        if self.decision_rule == DecisionRule.DETERMINISTIC:
+        if self.decision_rule == DecisionRule.DETERMINISTIC  or self.conditional_market_num == 1:
             current_price_list = self.read_current_pred()
             index = np.argmax(current_price_list)
             conditional_market, bucket = self.conditional_market_list[index], buckets[index]

@@ -5,7 +5,7 @@ import traceback
 from tqdm.notebook import tnrange
 from tqdm import trange
 from PolicyGradientAgent import StochasticGradientAgent, DeterministicGradientAgent
-import line_profiler
+# import line_profiler
 
 
 def stochastic_training_notebook(agent_list, learning_rate_theta, learning_rate_wv,

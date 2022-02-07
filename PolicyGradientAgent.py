@@ -364,7 +364,7 @@ class StochasticGradientAgent(Agent):
             axs[0].hlines(y=0.0, xmin=0, xmax=reward_history_df.shape[0], colors='black', linestyles='dashdot')
             # axs[0].plot(reward_history_df[v_column_name], label=v_column_name, zorder=-100)
             axs[0].scatter(x=reward_history_df.index, y=reward_history_df[reward_column_name],
-                           label=reward_column_name, maker='.', s=3)
+                           label=reward_column_name, marker='.', s=3)
             axs[0].plot(running_average_reward, zorder=-99, label='Average ' + reward_column_name)
 
             last_quarter_num = 3 * len(reward_history_df) // 4
