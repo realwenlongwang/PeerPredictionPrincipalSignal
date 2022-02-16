@@ -36,7 +36,9 @@ class WeightsInit(Enum):
     ZERO = 'zero initialisation'
     RANDOM = 'random initialisation'
 
-
+class ReportOrder(Enum):
+    FIXED = 0
+    RANDOM = 1
 
 def NaiveBayesOneIter(prior, signal, bucket_no, pr_rs_ru, pr_rs_bu):
     posterior = np.array(prior)

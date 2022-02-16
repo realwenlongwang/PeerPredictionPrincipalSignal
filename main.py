@@ -13,7 +13,7 @@ def stochastic_training_notebook(agent_list, learning_rate_theta, learning_rate_
                                  decay_rate, beta1, beta2, algorithm, learning_std,
                                  fixed_std, pr_red_ball_red_bucket, pr_red_ball_blue_bucket,
                                  prior_red_list, agent_num, action_num, score_func, decision_rule,
-                                 preferred_colour_pr_list, evaluation_step, weights_init):
+                                 preferred_colour_pr_list, evaluation_step, weights_init, report_order):
 
     if not agent_list:
         for i in range(agent_num):
@@ -31,6 +31,8 @@ def stochastic_training_notebook(agent_list, learning_rate_theta, learning_rate_
     nb_outcome_list = []
 
     for t in tnrange(training_episodes):
+        if report_order == ReportOrder.RANDOM:
+            np.random.shuffle(agent_list)
         dm_outcome, prior_outcome, nb_outcome, loss = stochastic_iterative_policy(action_num, prior_red_list, pr_red_ball_red_bucket,
                                                     pr_red_ball_blue_bucket, agent_list, t, decay_rate, score_func,
                                                     decision_rule, preferred_colour_pr_list)
@@ -47,7 +49,7 @@ def stochastic_training(learning_rate_theta, learning_rate_wv,
                         decay_rate, beta1, beta2, algorithm, learning_std,
                         fixed_std, pr_red_ball_red_bucket, pr_red_ball_blue_bucket,
                         prior_red_list, agent_num, action_num, score_func, decision_rule,
-                        preferred_colour_pr_list, evaluation_step, weight_init):
+                        preferred_colour_pr_list, evaluation_step, weight_init, report_order):
     agent_list = []
 
     for i in range(agent_num):
@@ -65,6 +67,8 @@ def stochastic_training(learning_rate_theta, learning_rate_wv,
     nb_outcome_list = []
 
     for t in trange(training_episodes):
+        if report_order == ReportOrder.RANDOM:
+            np.random.shuffle(agent_list)
         dm_outcome, prior_outcome, nb_outcome, loss = stochastic_iterative_policy(action_num, prior_red_list, pr_red_ball_red_bucket,
                                                     pr_red_ball_blue_bucket, agent_list, t, decay_rate, score_func,
                                                     decision_rule, preferred_colour_pr_list)
@@ -133,7 +137,7 @@ def deterministic_training_notebook(
         memory_size, batch_size, training_episodes,
         decay_rate, beta1, beta2, algorithm, pr_red_ball_red_bucket,
         pr_red_ball_blue_bucket, prior_red_list, agent_num, explorer_learning,
-        fixed_std, score_func, decision_rule, preferred_colour_pr_list, evaluation_step, weights_init):
+        fixed_std, score_func, decision_rule, preferred_colour_pr_list, evaluation_step, weights_init, report_order):
 
     if not agent_list:
         for i in range(agent_num):
@@ -147,7 +151,8 @@ def deterministic_training_notebook(
                 beta1=beta1,
                 beta2=beta2,
                 name='agent' + str(i),
-                algorithm=algorithm
+                algorithm=algorithm,
+                weights_init=weights_init
             )
             agent.evaluation_init(pr_red_ball_red_bucket, pr_red_ball_blue_bucket, evaluation_step)
             agent_list.append(agent)
@@ -161,6 +166,8 @@ def deterministic_training_notebook(
     nb_outcome_list = []
 
     for t in tnrange(training_episodes):
+        if report_order == ReportOrder.RANDOM:
+            np.random.shuffle(agent_list)
         dm_outcome, prior_outcome, nb_outcome, loss = deterministic_iterative_policy(
             action_num, prior_red_list, pr_red_ball_red_bucket,
             pr_red_ball_blue_bucket, agent_list, explorer,
@@ -180,7 +187,7 @@ def deterministic_training(
         memory_size, batch_size, training_episodes,
         decay_rate, beta1, beta2, algorithm, pr_red_ball_red_bucket,
         pr_red_ball_blue_bucket, prior_red_list, agent_num, explorer_learning,
-        fixed_std, score_func, decision_rule, preferred_colour_pr_list, evaluation_step, weight_init):
+        fixed_std, score_func, decision_rule, preferred_colour_pr_list, evaluation_step, weight_init, report_order):
     agent_list = []
 
     for i in range(agent_num):
@@ -203,6 +210,8 @@ def deterministic_training(
                         min_std=0.1)
 
     for t in trange(training_episodes):
+        if report_order == ReportOrder.RANDOM:
+            np.random.shuffle(agent_list)
         dm_outcome, prior_outcome, nb_outcome, loss = deterministic_iterative_policy(
             action_num, prior_red_list, pr_red_ball_red_bucket,
             pr_red_ball_blue_bucket, agent_list, explorer,
@@ -297,13 +306,14 @@ if __name__ == '__main__':
     decision_rule = DecisionRule.DETERMINISTIC
     evaluation_step = 1
     weights_init = WeightsInit.ZERO
+    report_order = ReportOrder.RANDOM
 
     stochastic_training(learning_rate_theta, learning_rate_wv,
                         memory_size, batch_size, training_episodes,
                         decay_rate, beta1, beta2, algorithm, learning_std,
                         fixed_std, pr_red_ball_red_bucket, pr_red_ball_blue_bucket,
                         prior_red_list, agent_num, action_num, score_func, decision_rule,
-                        preferred_colour_pr_list, evaluation_step, weights_init)
+                        preferred_colour_pr_list, evaluation_step, weights_init, report_order)
 
     # feature_num = 3
     # action_num = 2
