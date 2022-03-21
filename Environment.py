@@ -51,6 +51,17 @@ def NaiveBayesOneIter(prior, signal, bucket_no, pr_rs_ru, pr_rs_bu):
 
     return posterior
 
+def BayesianUpdateMat(signal_mat, pr_rs_ru, pr_rs_bu):
+    action_num = signal_mat.shape[1] // 3
+    theta = np.zeros(shape=(3 * action_num, action_num))
+    theta[np.arange(start=3 - 1, stop=3 * action_num, step=3), np.arange(action_num)] = 1
+    theta[np.arange(start=0, stop=3 * action_num, step=3),
+          np.arange(action_num)] = np.log(pr_rs_ru) - np.log(pr_rs_bu)
+    theta[np.arange(start=1, stop=3 * action_num, step=3),
+          np.arange(action_num)] = np.log(1 - pr_rs_ru) - np.log(1 - pr_rs_bu)
+    logit_pos = np.matmul(signal_mat, theta)
+    return logit_pos
+
 class PredictionMarket:
 
     def __init__(self, no, prior_red):
@@ -201,15 +212,20 @@ class MultiBuckets:
         for no, prior_red in zip(range(bucket_num), prior_red_instances):
             self.bucket_list.append(Bucket(no, prior_red, pr_red_ball_red_bucket, pr_red_ball_blue_bucket))
 
-    def signal(self, t):
+    def signal(self, size, t):
 
+        signal_mat = np.zeros(shape=(1, 3 * self.bucket_num))
         # Randomly select a bucket
-        bucket = np.random.choice(self.bucket_list)
+        buckets = np.random.choice(self.bucket_list, size=size)
 
+        for bucket in buckets:
+            ball = bucket.signal()
+            signal_mat[0, bucket.no * 3 + ball.value] += 1
         # # Always select a different bucket for each agent
         # bucket = self.bucket_list[self.index % self.bucket_num]
         # self.index += 1
-        return bucket.no, bucket.signal()
+
+        return signal_mat
 
 
 class Explorer:
