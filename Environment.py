@@ -66,29 +66,37 @@ class PredictionMarket:
 
     def __init__(self, no, prior_red):
         self.no = no
-        self.current_prediction = [prior_red, 1 - prior_red]
-        self.sampled_prediction_history = [self.current_prediction.copy()]
-        self.mean_prediction_history = [self.current_prediction.copy()]
+        self.current_prediction = prior_red
+        self.sampled_prediction_history = [self.current_prediction]
+        self.mean_prediction_history = [self.current_prediction]
 
 
     def report(self, sampled_prediction, mean_prediction):
         # Record the contract if multiple traders.
-        self.sampled_prediction_history.append(sampled_prediction.copy())
-        self.mean_prediction_history.append(mean_prediction.copy())
-        self.current_prediction = mean_prediction.copy()
+        self.sampled_prediction_history.append(sampled_prediction)
+        self.mean_prediction_history.append(mean_prediction)
+        self.current_prediction = mean_prediction
 
     def log_resolve(self, materialised_index):
         score_list = []
         for i in range(len(self.sampled_prediction_history) - 1): # minus the initial report
-            scores = np.log(self.sampled_prediction_history[i + 1]) - np.log(self.mean_prediction_history[i])
+            current_prob = expit(self.sampled_prediction_history[i + 1])
+            current_prob_tuple = [current_prob, 1 - current_prob]
+            prev_prob = expit(self.mean_prediction_history[i])
+            prev_prob_tuple = [prev_prob, 1 - prev_prob]
+            scores = np.log(current_prob_tuple) - np.log(prev_prob_tuple)
             score_list.append(scores.copy()[materialised_index])
         return np.array(score_list)
 
     def brier_resolve(self, materialised_index):
         score_list = []
         for i in range(len(self.sampled_prediction_history) - 1):
-            current_scores = self.sampled_prediction_history[i + 1][materialised_index] - np.sum(np.square(self.sampled_prediction_history[i + 1])) / 2
-            previous_scores = self.mean_prediction_history[i][materialised_index] - np.sum(np.square(self.mean_prediction_history[i])) / 2
+            current_prob = expit(self.sampled_prediction_history[i + 1])
+            current_prob_tuple = [current_prob, 1 - current_prob]
+            prev_prob = expit(self.mean_prediction_history[i])
+            prev_prob_tuple = [prev_prob, 1 - prev_prob]
+            current_scores = current_prob_tuple[materialised_index] - np.sum(np.square(current_prob_tuple)) / 2
+            previous_scores = prev_prob_tuple[materialised_index] - np.sum(np.square(prev_prob_tuple)) / 2
             score_list.append(current_scores - previous_scores)
         return np.array(score_list)
 
@@ -112,8 +120,8 @@ class DecisionMarket:
         self.preferred_colour_pr_list = preferred_colour_pr_list
 
     def report(self, sampled_predictions, mean_predictions):
-        for pm, pi, mu in zip(self.conditional_market_list, sampled_predictions[0], mean_predictions[0]):
-            pm.report([np.asscalar(pi), 1 - np.asscalar(pi)], [np.asscalar(mu), 1 - np.asscalar(mu)])
+        for pm, pi, mu in zip(self.conditional_market_list, np.squeeze(sampled_predictions), np.squeeze(mean_predictions)):
+            pm.report(np.asscalar(pi), np.asscalar(mu))
 
     def log_resolve(self, buckets):
         if self.decision_rule == DecisionRule.DETERMINISTIC or self.conditional_market_num == 1:
@@ -127,7 +135,7 @@ class DecisionMarket:
         else:
             # TODO: consider move the generator initialisation outside and init once only. May speed up training.
             generator = Generator(PCG64())
-            sorted_market_list = sorted(self.conditional_market_list, key=lambda market: market.current_prediction[0],
+            sorted_market_list = sorted(self.conditional_market_list, key=lambda market: market.current_prediction,
                                         reverse=True)
             pr, conditional_market = generator.choice(list(zip(self.preferred_colour_pr_list, sorted_market_list)),
                                                       p=self.preferred_colour_pr_list)
@@ -150,7 +158,7 @@ class DecisionMarket:
         else:
             # TODO: consider move the generator initialisation outside and init once only. May speed up training.
             generator = Generator(PCG64())
-            sorted_market_list = sorted(self.conditional_market_list, key=lambda market: market.current_prediction[0],
+            sorted_market_list = sorted(self.conditional_market_list, key=lambda market: market.current_prediction,
                                         reverse=True)
             pr, conditional_market = generator.choice(list(zip(self.preferred_colour_pr_list, sorted_market_list)),
                                                       p=self.preferred_colour_pr_list)
@@ -172,7 +180,7 @@ class DecisionMarket:
 
 
     def read_current_pred(self):
-        current_price_list = list(pm.current_prediction[0] for pm in self.conditional_market_list)
+        current_price_list = list(pm.current_prediction for pm in self.conditional_market_list)
 
         return current_price_list
 
