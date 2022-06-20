@@ -59,7 +59,7 @@ def BayesianUpdateMat(signal_mat, pr_rs_ru, pr_rs_bu):
           np.arange(action_num)] = np.log(pr_rs_ru) - np.log(pr_rs_bu)
     theta[np.arange(start=1, stop=3 * action_num, step=3),
           np.arange(action_num)] = np.log(1 - pr_rs_ru) - np.log(1 - pr_rs_bu)
-    logit_pos = np.matmul(signal_mat, theta)
+    logit_pos = np.squeeze(np.matmul(signal_mat, theta))
     return logit_pos
 
 class PredictionMarket:

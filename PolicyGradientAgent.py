@@ -108,18 +108,19 @@ class Agent:
 
         return mean_weights_df_list
 
-    def mean_weights_history_plot(self):
+    def mean_weights_history_plot(self, dir_path=None):
         mean_weights_df_list = self.mean_weights_history_df()
 
         for df, title_no in zip(mean_weights_df_list, range(self.action_num)):
+            last_third_idx = len(df) // 3
             fig, axs = plt.subplots(self.action_num, figsize=(18, 9 * self.action_num), squeeze=False)
             for bucket_no in range(self.action_num):
                 axs[bucket_no, 0].plot(df.iloc[1:, bucket_no * self.feature_num + 0], 'r',
                                        label='Bucket ' + str(bucket_no) + ' Red weight')
                 axs[bucket_no, 0].plot(df.iloc[1:, bucket_no * self.feature_num + 1], 'b',
-                                       label='Bucket ' + str(bucket_no) + 'Blue weight')
+                                       label='Bucket ' + str(bucket_no) + ' Blue weight')
                 axs[bucket_no, 0].plot(df.iloc[1:, bucket_no * self.feature_num + 2], 'g',
-                                       label='Bucket ' + str(bucket_no) + 'Prior weight')
+                                       label='Bucket ' + str(bucket_no) + ' Prior weight')
                 axs[bucket_no, 0].hlines(y=np.log(self.pr_red_ball_red_bucket / self.pr_red_ball_blue_bucket), xmin=0,
                                          xmax=len(df), colors='red',
                                          linestyles='dashdot')
@@ -127,6 +128,11 @@ class Agent:
                                            xy=(len(df) / 2,
                                                np.log(self.pr_red_ball_red_bucket / self.pr_red_ball_blue_bucket)),
                                            xytext=(len(df) / 2, np.log(2) / 2), arrowprops=dict(arrowstyle="->"))
+                if bucket_no == title_no:
+                    axs[bucket_no, 0].annotate('std:%.3f' % df.iloc[last_third_idx:, 0].std(),
+                                           xy=(len(df) * 0.8,
+                                               np.log(self.pr_red_ball_red_bucket / self.pr_red_ball_blue_bucket)),
+                                           xytext=(len(df) * 0.8, np.log(2) / 2), arrowprops=dict(arrowstyle="->"))
                 axs[bucket_no, 0].hlines(
                     y=np.log((1 - self.pr_red_ball_red_bucket) / (1 - self.pr_red_ball_blue_bucket)), xmin=0,
                     xmax=len(df), colors='blue',
@@ -135,11 +141,17 @@ class Agent:
                     '%.3f' % np.log((1 - self.pr_red_ball_red_bucket) / (1 - self.pr_red_ball_blue_bucket)),
                     xy=(len(df) / 2, np.log((1 - self.pr_red_ball_red_bucket) / (1 - self.pr_red_ball_blue_bucket))),
                     xytext=(len(df) / 2, np.log(1 / 2) / 2), arrowprops=dict(arrowstyle="->"))
+                if bucket_no == title_no:
+                    axs[bucket_no, 0].annotate(
+                    'std:%.3f' % df.iloc[last_third_idx:, 1].std(),
+                    xy=(len(df) * 0.8, np.log((1 - self.pr_red_ball_red_bucket) / (1 - self.pr_red_ball_blue_bucket))),
+                    xytext=(len(df) * 0.8, np.log(1 / 2) / 2), arrowprops=dict(arrowstyle="->"))
                 axs[bucket_no, 0].hlines(y=1, xmin=0, xmax=len(df), colors='green', linestyles='dashdot')
                 axs[bucket_no, 0].hlines(y=0, xmin=0, xmax=len(df), colors='black', linestyles='dashdot')
                 axs[bucket_no, 0].legend(loc='upper left')
                 fig.suptitle('Bucket ' + str(title_no) + ' Mean Weights History')
-
+                if dir_path is not None:
+                    plt.savefig(dir_path + self.name + '_bucket' + str(title_no) + '_mean_weights.png')
 
 class StochasticGradientAgent(Agent):
 
@@ -286,7 +298,8 @@ class StochasticGradientAgent(Agent):
         deltas = experience_batch[:, :,
                  (self.feature_num + 4) * self.action_num:(self.feature_num + 5) * self.action_num]
 
-        batch_gradient_means = np.matmul(signal_array, deltas * ((hs - means) / np.power(stds, 2)))
+        # prs = expit(hs)
+        batch_gradient_means = np.matmul(signal_array, deltas * ((hs - means) / np.power(stds, 2))) #* prs * (1 - prs)
         if self.learning_std:
             batch_gradient_stds = np.matmul(signal_array, deltas * (np.power(hs - means, 2) / np.power(stds, 2) - 1))
         batch_gradient_v = np.matmul(signal_array, deltas)

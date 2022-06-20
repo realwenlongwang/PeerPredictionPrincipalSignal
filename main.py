@@ -27,23 +27,36 @@ def stochastic_training_notebook(agent_list, learning_rate_theta, learning_rate_
             agent.evaluation_init(pr_red_ball_red_bucket, pr_red_ball_blue_bucket, evaluation_step)
             agent_list.append(agent)
 
-    loss_list = []
-    dm_outcome_list = []
-    prior_outcome_list = []
-    nb_outcome_list = []
+    metric_dict = {}
+    metric_dict['loss'] = []
+    for action_no in range(action_num):
+        metric_dict[f'action_{action_no}_pred'] = []
+        metric_dict[f'bayesian_{action_no}_pred'] = []
+    metric_dict['dm_outcome'] = []
+    metric_dict['prior_outcome'] = []
+    metric_dict['bayesian_outcome'] = []
+    metric_dict['dr_outcome'] = [] # consider delete in the future
+    metric_dict['dm_arm'] = []
 
     for t in tnrange(training_episodes):
         if report_order == ReportOrder.RANDOM:
             np.random.shuffle(agent_list)
-        dm_outcome, prior_outcome, nb_outcome, loss = stochastic_iterative_policy(action_num, prior_red_list, pr_red_ball_red_bucket,
+        final_prediction, bayesian_prediction, arm, \
+        dm_outcome, prior_outcome, nb_outcome, dr_outcome, loss = stochastic_iterative_policy(action_num, prior_red_list, pr_red_ball_red_bucket,
                                                     pr_red_ball_blue_bucket, agent_list, t, decay_rate, score_func,
                                                     decision_rule, preferred_colour_pr_list, signal_size_list)
-        dm_outcome_list.append(dm_outcome)
-        prior_outcome_list.append(prior_outcome)
-        nb_outcome_list.append(nb_outcome)
-        loss_list.append(loss)
+        for action_no in range(action_num):
+            metric_dict[f'action_{action_no}_pred'].append(final_prediction[action_no])
+            metric_dict[f'bayesian_{action_no}_pred'].append(bayesian_prediction[action_no])
 
-    return agent_list, dm_outcome_list, prior_outcome_list, nb_outcome_list, loss_list
+        metric_dict['dm_arm'].append(arm)
+        metric_dict['dm_outcome'].append(dm_outcome)
+        metric_dict['prior_outcome'].append(prior_outcome)
+        metric_dict['bayesian_outcome'].append(nb_outcome)
+        metric_dict['dr_outcome'].append(dr_outcome)
+        metric_dict['loss'].append(loss)
+
+    return metric_dict
 
 
 def stochastic_training(learning_rate_theta, learning_rate_wv,
@@ -69,20 +82,29 @@ def stochastic_training(learning_rate_theta, learning_rate_wv,
     dm_outcome_list = []
     prior_outcome_list = []
     nb_outcome_list = []
+    final_prediction_list = []
+    bayesian_prediction_list = []
+    arm_list = []
 
     for t in trange(training_episodes):
         if report_order == ReportOrder.RANDOM:
             np.random.shuffle(agent_list)
-        dm_outcome, prior_outcome, nb_outcome, loss = stochastic_iterative_policy(action_num, prior_red_list, pr_red_ball_red_bucket,
+        final_prediction, bayesian_prediction, arm, \
+        dm_outcome, prior_outcome, nb_outcome, dr_outcome, loss = stochastic_iterative_policy(action_num, prior_red_list, pr_red_ball_red_bucket,
                                                     pr_red_ball_blue_bucket, agent_list, t, decay_rate, score_func,
                                                     decision_rule, preferred_colour_pr_list, signal_size_list)
+
+        final_prediction_list.append(final_prediction)
+        bayesian_prediction_list.append(bayesian_prediction)
+        arm_list.append(arm)
         dm_outcome_list.append(dm_outcome)
         prior_outcome_list.append(prior_outcome)
         nb_outcome_list.append(nb_outcome)
         loss_list.append(loss)
 
 
-    return agent_list, dm_outcome_list, prior_outcome_list, loss_list
+    return final_prediction_list, bayesian_prediction_list, arm_list,\
+           agent_list, dm_outcome_list, prior_outcome_list, loss_list
 
 
 def stochastic_iterative_policy(action_num, prior_red_list, pr_red_ball_red_bucket, pr_red_ball_blue_bucket, agent_list,
@@ -126,15 +148,23 @@ def stochastic_iterative_policy(action_num, prior_red_list, pr_red_ball_red_buck
 
         agent.learning_rate_decay(epoch=t, decay_rate=decay_rate)
 
+
     final_prediction = expit(dm.read_current_pred())
-    loss = np.sum(np.square(expit(logit_pos) - final_prediction))
+    bayesian_prediction = expit(logit_pos)
+    loss = np.sqrt(np.mean(np.square(np.log(bayesian_prediction) - np.log(final_prediction))))
     dm_outcome = buckets.bucket_list[arm].colour == BucketColour.RED
+    # Evaluation_purpose:
+    dr_arm = np.argmax(final_prediction)
+    dr_outcome = buckets.bucket_list[dr_arm].colour == BucketColour.RED
+    ####################
     prior_arm = np.argmax(prior_red_instances)
     prior_outcome = buckets.bucket_list[prior_arm].colour == BucketColour.RED
     nb_arm = np.argmax(expit(logit_pos))
     nb_outcome = buckets.bucket_list[nb_arm].colour == BucketColour.RED
 
-    return dm_outcome, prior_outcome, nb_outcome, loss
+    return final_prediction, bayesian_prediction, \
+           arm, dm_outcome, prior_outcome,\
+           nb_outcome, dr_outcome, loss
 
 
 def deterministic_training_notebook(
