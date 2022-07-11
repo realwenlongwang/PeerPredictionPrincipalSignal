@@ -324,72 +324,72 @@ def deterministic_iterative_policy(action_num, prior_red_list, pr_red_ball_red_b
 
 
 if __name__ == '__main__':
-    # learning_rate_theta = 1e-4
-    # learning_rate_wv = 1e-4
-    # memory_size = 16
-    # batch_size = 16
-    # training_episodes = int(1e6)
-    # decay_rate = 0
-    # beta1 = 0.9
-    # beta2 = 0.9999
-    # # Algorithm: adam, momentum, regular
-    # algorithm = Algorithm.REGULAR
-    # learning_std = False
-    # fixed_std = 0.3
-    # # Bucket parameters
-    # pr_red_ball_red_bucket = 2 / 3
-    # pr_red_ball_blue_bucket = 1 / 3
-    # prior_red_list = logit([3 / 4, 1 / 4])
-    # agent_num = 2
-    # action_num = 2
-    # preferred_colour_pr_list = [0.9, 0.1]
-    # score_func = ScoreFunction.LOG
-    # decision_rule = DecisionRule.DETERMINISTIC
-    # evaluation_step = 1
-    # weights_init = WeightsInit.ZERO
-    # report_order = ReportOrder.RANDOM
-    # signal_size_list = [1, 1]
-    #
-    # stochastic_training(learning_rate_theta, learning_rate_wv,
-    #                     memory_size, batch_size, training_episodes,
-    #                     decay_rate, beta1, beta2, algorithm, learning_std,
-    #                     fixed_std, pr_red_ball_red_bucket, pr_red_ball_blue_bucket,
-    #                     prior_red_list, agent_num, action_num, score_func, decision_rule,
-    #                     preferred_colour_pr_list, evaluation_step, weights_init, report_order, signal_size_list)
-
-    feature_num = 3
-    action_num = 2
     learning_rate_theta = 1e-4
-    decay_rate = 0  # 0.001
     learning_rate_wv = 1e-4
-    learning_rate_wq = 1e-2
     memory_size = 16
     batch_size = 16
-    training_episodes = 900000
+    training_episodes = int(1e6)
+    decay_rate = 0
     beta1 = 0.9
     beta2 = 0.9999
-    fixed_std = 0.3
     # Algorithm: adam, momentum, regular
     algorithm = Algorithm.REGULAR
+    learning_std = False
+    fixed_std = 0.3
     # Bucket parameters
-    prior_red_list = logit([3 / 4, 1 / 4])
     pr_red_ball_red_bucket = 2 / 3
     pr_red_ball_blue_bucket = 1 / 3
-    agent_num = 1
-
-    explorer_learning = False
-    decision_rule = DecisionRule.STOCHASTIC
+    prior_red_list = logit([3 / 4, 1 / 4])
+    agent_num = 2
+    action_num = 2
+    preferred_colour_pr_list = [0.9, 0.1]
     score_func = ScoreFunction.LOG
-    preferred_colour_pr_list = [0.8, 0.2]
+    decision_rule = DecisionRule.DETERMINISTIC
+    evaluation_step = 1
     weights_init = WeightsInit.ZERO
     report_order = ReportOrder.RANDOM
-    signal_size_list = [2]
-    evaluation_step = 1
+    signal_size_list = [1, 1]
 
-    agent_list = deterministic_training(     feature_num, action_num, learning_rate_theta, learning_rate_wv, learning_rate_wq,
-                                             memory_size, batch_size, training_episodes,
-                                             decay_rate, beta1, beta2, algorithm, pr_red_ball_red_bucket,
-                                             pr_red_ball_blue_bucket, prior_red_list, agent_num,
-                                             explorer_learning, fixed_std, score_func, decision_rule, preferred_colour_pr_list, evaluation_step, weights_init, report_order, signal_size_list)
+    stochastic_training(learning_rate_theta, learning_rate_wv,
+                        memory_size, batch_size, training_episodes,
+                        decay_rate, beta1, beta2, algorithm, learning_std,
+                        fixed_std, pr_red_ball_red_bucket, pr_red_ball_blue_bucket,
+                        prior_red_list, agent_num, action_num, score_func, decision_rule,
+                        preferred_colour_pr_list, evaluation_step, weights_init, report_order, signal_size_list)
+
+    # feature_num = 3
+    # action_num = 2
+    # learning_rate_theta = 1e-4
+    # decay_rate = 0  # 0.001
+    # learning_rate_wv = 1e-4
+    # learning_rate_wq = 1e-2
+    # memory_size = 16
+    # batch_size = 16
+    # training_episodes = 900000
+    # beta1 = 0.9
+    # beta2 = 0.9999
+    # fixed_std = 0.3
+    # # Algorithm: adam, momentum, regular
+    # algorithm = Algorithm.REGULAR
+    # # Bucket parameters
+    # prior_red_list = logit([3 / 4, 1 / 4])
+    # pr_red_ball_red_bucket = 2 / 3
+    # pr_red_ball_blue_bucket = 1 / 3
+    # agent_num = 1
+    #
+    # explorer_learning = False
+    # decision_rule = DecisionRule.STOCHASTIC
+    # score_func = ScoreFunction.LOG
+    # preferred_colour_pr_list = [0.8, 0.2]
+    # weights_init = WeightsInit.ZERO
+    # report_order = ReportOrder.RANDOM
+    # signal_size_list = [2]
+    # evaluation_step = 1
+    #
+    # agent_list = deterministic_training(     feature_num, action_num, learning_rate_theta, learning_rate_wv, learning_rate_wq,
+    #                                          memory_size, batch_size, training_episodes,
+    #                                          decay_rate, beta1, beta2, algorithm, pr_red_ball_red_bucket,
+    #                                          pr_red_ball_blue_bucket, prior_red_list, agent_num,
+    #                                          explorer_learning, fixed_std, score_func, decision_rule, preferred_colour_pr_list, evaluation_step, weights_init, report_order, signal_size_list)
 
 

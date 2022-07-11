@@ -225,6 +225,9 @@ class MultiBuckets:
         signal_mat = np.zeros(shape=(1, 3 * self.bucket_num))
         # Randomly select a bucket
         buckets = np.random.choice(self.bucket_list, size=size)
+        # # For test purpose, comment out below two lines afterwards.
+        # assert size == 1, "size cannot be greater than 1 in test mode."
+        # buckets = [self.bucket_list[0]]
 
         for bucket in buckets:
             ball = bucket.signal()
@@ -232,6 +235,8 @@ class MultiBuckets:
         # # Always select a different bucket for each agent
         # bucket = self.bucket_list[self.index % self.bucket_num]
         # self.index += 1
+
+
 
         return signal_mat
 

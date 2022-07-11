@@ -209,9 +209,7 @@ class StochasticGradientAgent(Agent):
         #     raise AssertionError('Warning: report is None !!!')
 
         # if self.evaluating and (t % self.evaluation_step == 0):
-        #     self.report_history_list.append([bucket_no, ball_colour.name])
-        #     self.reward_history_list.append([bucket_no, ball_colour.name])
-        #     for i, pr, h, mean, std in zip(range(self.action_num), current_prediction, h_array.ravel(),
+        #     for i, h, mean, std in zip(range(self.action_num), h_array.ravel(),
         #                                    mean_array.ravel(), std_array.ravel()):
         #         self.report_history_list[-1].append(pr)
         #         self.report_history_list[-1].append(expit(h))
@@ -254,15 +252,16 @@ class StochasticGradientAgent(Agent):
         self.memory[idx, 0, (self.feature_num + 4) * self.action_num:(self.feature_num + 5) * self.action_num] = delta
 
         if self.evaluating and (t % self.evaluation_step == 0):
+            entry = {
+                    'bucket_0_red': signal_array[0, 0], 'bucket_0_blue': signal_array[0, 1],
+                    'bucket_0_prior': signal_array[0, 2], 'bucket_1_red': signal_array[0, 3],
+                    'bucket_1_blue': signal_array[0, 4], 'bucket_1_prior': signal_array[0, 5]
+            }
+            self.reward_history_list.append(entry)
+
             for bucket_no, reward, v in zip(range(self.action_num), reward_array.ravel(), v_array.ravel()):
-                # self.reward_history_list[-1].append(reward)
-                # self.reward_history_list[-1].append(v)
-                # self.reward_history_list[-1].append(compute_regret(
-                #     signal_array=one_hot_decode(signal_array[:2]),
-                #     pi=expit(h_array),
-                #     prior_red=signal_array[2],
-                #     pr_red_ball_red_bucket=self.pr_red_ball_red_bucket,
-                #     pr_red_ball_blue_bucket=self.pr_red_ball_blue_bucket))
+                self.reward_history_list[-1][f'score_{bucket_no}'] = reward
+                self.reward_history_list[-1][f'v_{bucket_no}'] = v
                 self.mean_weights_history_list[bucket_no].append(self.theta_mean[:, bucket_no].copy().ravel())
                 if self.learning_std:
                     self.std_weights_history_list[bucket_no].append(self.theta_std[:, bucket_no].copy().ravel())
@@ -357,12 +356,7 @@ class StochasticGradientAgent(Agent):
                     self.std_gradients_history_list[bucket_no].append(gradient_std[:, bucket_no].ravel())
 
     def reward_history_dataframe(self):
-        column_list = ['bucket_no', 'signal']
-        for bucket_no in range(self.action_num):
-            column_list.append('bucket_' + str(bucket_no) + '_reward')
-            column_list.append('bucket_' + str(bucket_no) + '_v')
-        reward_history_df = pd.DataFrame(self.reward_history_list,
-                                         columns=column_list)
+        reward_history_df = pd.DataFrame(self.reward_history_list)
         return reward_history_df
 
     def reward_history_plot(self, top_margin=0.01, bottom_margin=0.005):
