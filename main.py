@@ -8,7 +8,7 @@ from PolicyGradientAgent import StochasticGradientAgent, DeterministicGradientAg
 # import line_profiler
 
 
-def stochastic_training_notebook(agent_list, learning_rate_theta, learning_rate_wv,
+def stochastic_training(training_platform, agent_list, learning_rate_theta, learning_rate_wv,
                                  memory_size, batch_size, training_episodes,
                                  decay_rate, beta1, beta2, algorithm, learning_std,
                                  fixed_std, pr_red_ball_red_bucket, pr_red_ball_blue_bucket,
@@ -38,7 +38,9 @@ def stochastic_training_notebook(agent_list, learning_rate_theta, learning_rate_
     metric_dict['dr_outcome'] = [] # consider delete in the future
     metric_dict['dm_arm'] = []
 
-    for t in tnrange(training_episodes):
+    iter_range = tnrange(training_episodes) if training_platform == TrainingPlatform.Notebook else trange(training_episodes)
+
+    for t in iter_range:
         if report_order == ReportOrder.RANDOM:
             np.random.shuffle(agent_list)
         final_prediction, bayesian_prediction, arm, \
@@ -57,55 +59,6 @@ def stochastic_training_notebook(agent_list, learning_rate_theta, learning_rate_
         metric_dict['loss'].append(loss)
 
     return metric_dict
-
-
-def stochastic_training(learning_rate_theta, learning_rate_wv,
-                        memory_size, batch_size, training_episodes,
-                        decay_rate, beta1, beta2, algorithm, learning_std,
-                        fixed_std, pr_red_ball_red_bucket, pr_red_ball_blue_bucket,
-                        prior_red_list, agent_num, action_num, score_func, decision_rule,
-                        preferred_colour_pr_list, evaluation_step, weight_init, report_order, signal_size_list):
-    agent_list = []
-
-    assert len(signal_size_list) == action_num, "The length of signal_size_list should equal to the number of agents."
-
-    for i in range(agent_num):
-        agent = StochasticGradientAgent(feature_num=3, action_num=action_num,
-                                        learning_rate_theta=learning_rate_theta, learning_rate_wv=learning_rate_wv,
-                                        memory_size=memory_size, batch_size=batch_size, beta1=beta1, beta2=beta2,
-                                        learning_std=learning_std, fixed_std=fixed_std, name='agent' + str(i),
-                                        algorithm=algorithm, weights_init=weight_init)
-        agent.evaluation_init(pr_red_ball_red_bucket, pr_red_ball_blue_bucket, evaluation_step)
-        agent_list.append(agent)
-
-    loss_list = []
-    dm_outcome_list = []
-    prior_outcome_list = []
-    nb_outcome_list = []
-    final_prediction_list = []
-    bayesian_prediction_list = []
-    arm_list = []
-
-    for t in trange(training_episodes):
-        if report_order == ReportOrder.RANDOM:
-            np.random.shuffle(agent_list)
-        final_prediction, bayesian_prediction, arm, \
-        dm_outcome, prior_outcome, nb_outcome, dr_outcome, loss = stochastic_iterative_policy(action_num, prior_red_list, pr_red_ball_red_bucket,
-                                                    pr_red_ball_blue_bucket, agent_list, t, decay_rate, score_func,
-                                                    decision_rule, preferred_colour_pr_list, signal_size_list)
-
-        final_prediction_list.append(final_prediction)
-        bayesian_prediction_list.append(bayesian_prediction)
-        arm_list.append(arm)
-        dm_outcome_list.append(dm_outcome)
-        prior_outcome_list.append(prior_outcome)
-        nb_outcome_list.append(nb_outcome)
-        loss_list.append(loss)
-
-
-    return final_prediction_list, bayesian_prediction_list, arm_list,\
-           agent_list, dm_outcome_list, prior_outcome_list, loss_list
-
 
 def stochastic_iterative_policy(action_num, prior_red_list, pr_red_ball_red_bucket, pr_red_ball_blue_bucket, agent_list,
                                 t, decay_rate, score_func, decision_rule, preferred_colour_pr_list, signal_size_list):

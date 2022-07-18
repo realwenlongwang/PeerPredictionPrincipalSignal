@@ -16,11 +16,15 @@ class BucketColour(Enum):
     RED = 0
     BLUE = 1
 
+class TrainingPlatform(Enum):
+    Notebook = 'Notebook'
+    Python = 'Python'
+
 
 class Algorithm(Enum):
-    REGULAR = 'regular'
-    MOMENTUM = 'momentum'
-    ADAM = 'adam'
+    REGULAR = 'Regular'
+    MOMENTUM = 'Momentum'
+    ADAM = 'Adam'
 
 
 class ScoreFunction(Enum):
@@ -33,8 +37,8 @@ class DecisionRule(Enum):
     DETERMINISTIC = 1
 
 class WeightsInit(Enum):
-    ZERO = 'zero initialisation'
-    RANDOM = 'random initialisation'
+    ZERO = 'Zero initialisation'
+    RANDOM = 'Random initialisation'
 
 class ReportOrder(Enum):
     FIXED = 0
