@@ -17,6 +17,7 @@ plt.rcParams.update({'font.size': 20})
 import pyarrow.feather as feather
 import os
 from scipy.ndimage import uniform_filter1d
+import gc
 
 
 # In[4]:
@@ -26,8 +27,8 @@ training_platform = TrainingPlatform.Python
 agent_num=3
 action_num=2
 signal_size =1
-learning_rate_theta = 1e-4 / signal_size
-learning_rate_wv = 1e-4 / signal_size
+learning_rate_theta = 1e-3 / signal_size
+learning_rate_wv = 1e-3 / signal_size
 memory_size = 16
 batch_size = 16
 training_episodes = int(8e4)
@@ -45,7 +46,6 @@ prior_red_list = None
 preferred_colour_pr_list = [0.99, 0.01]
 score_func = ScoreFunction.LOG
 decision_rule = DecisionRule.DETERMINISTIC
-agent_list = []
 evaluation_step = 10
 weights_init = WeightsInit.RANDOM
 report_order = ReportOrder.FIXED
@@ -55,6 +55,7 @@ test_times = 3
 
 for i in range(test_times):
     print(f'Test {i}')
+    agent_list = []
     metric_dict = stochastic_training(
                                  training_platform, agent_list, learning_rate_theta, learning_rate_wv,
                                  memory_size, batch_size, training_episodes,
@@ -158,6 +159,8 @@ for i in range(test_times):
                                    label='Bucket1 Blue weight', color='darkblue')
             axs[ag_no, ac_no].plot(df.iloc[1:, 1 * feature_num + 2],
                                    label='Bucket1 Prior weight', color='darkgreen')
+        del mean_weights_df_list
+        del reward_df
 
     for r_no in range(agent_num):
         axs[r_no, 0].set_ylabel(f'Agent {r_no}')
@@ -188,5 +191,12 @@ for i in range(test_times):
 
     plt.savefig(dir_path + 'mean_weights.png', bbox_inches='tight')
 
+    # clear memory for next iteration
+    del agent_list
+    del metric_dict
+    del metric_df
+    del rolling_df
+
+    gc.collect()
 
 
