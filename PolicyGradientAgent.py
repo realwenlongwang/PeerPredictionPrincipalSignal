@@ -17,9 +17,9 @@ class Agent:
             self.theta_mean = np.zeros((feature_num * action_num, action_num))
         elif weights_init == WeightsInit.RANDOM:
             self.theta_mean = np.random.uniform(low=-1.0, high=1.0, size=(feature_num * action_num, action_num))
-
+        elif weights_init == WeightsInit.CUSTOMISED:
         # self.theta_mean = np.random.normal(0, np.sqrt(2/(feature_num * action_num)), (feature_num * action_num, action_num))
-        # self.theta_mean = np.array([[0.0, -1.2], [0.0, -1.2], [0.0, 0.0], [-1.2, 0.0], [-1.2, 0.0], [0.0, 0.0]])
+            self.theta_mean = np.array([[0.0, -1.4], [0.0, -1.4], [0.0, 0.0], [-1.4, 0.0], [-1.4, 0.0], [0.0, 0.0]])
         self.init_learning_rate_theta = learning_rate_theta
         self.learning_rate_theta = self.init_learning_rate_theta
         self.feature_num = feature_num
@@ -238,7 +238,7 @@ class StochasticGradientAgent(Agent):
     def store_experience(self, t, signal_array, h_array, mean_array, std_array, reward_array):
 
         v_array = np.matmul(signal_array, self.w_v)
-        delta = reward_array - v_array
+        delta = reward_array.sum() - v_array
 
         idx = t % self.memory_size
         self.memory[idx, 0, :self.feature_num * self.action_num] = signal_array
@@ -248,7 +248,7 @@ class StochasticGradientAgent(Agent):
         self.memory[idx, 0,
         (self.feature_num + 2) * self.action_num:(self.feature_num + 3) * self.action_num] = std_array
         self.memory[idx, 0,
-        (self.feature_num + 3) * self.action_num:(self.feature_num + 4) * self.action_num] = reward_array
+        (self.feature_num + 3) * self.action_num:(self.feature_num + 4) * self.action_num] = reward_array.sum()
         self.memory[idx, 0, (self.feature_num + 4) * self.action_num:(self.feature_num + 5) * self.action_num] = delta
 
         if self.evaluating and (t % self.evaluation_step == 0):
@@ -299,6 +299,7 @@ class StochasticGradientAgent(Agent):
 
         # prs = expit(hs)
         batch_gradient_means = np.matmul(signal_array, deltas * ((hs - means) / np.power(stds, 2))) #* prs * (1 - prs)
+        # batch_gradient_means = np.matmul(signal_array, rewards * ((hs - means) / np.power(stds, 2)))  # * prs * (1 - prs)
         if self.learning_std:
             batch_gradient_stds = np.matmul(signal_array, deltas * (np.power(hs - means, 2) / np.power(stds, 2) - 1))
         batch_gradient_v = np.matmul(signal_array, deltas)

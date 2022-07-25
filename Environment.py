@@ -36,9 +36,11 @@ class DecisionRule(Enum):
     STOCHASTIC = 0
     DETERMINISTIC = 1
 
+
 class WeightsInit(Enum):
     ZERO = 'Zero initialisation'
     RANDOM = 'Random initialisation'
+    CUSTOMISED = 'Customised initialisation'
 
 class ReportOrder(Enum):
     FIXED = 0

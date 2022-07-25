@@ -47,16 +47,17 @@ def stochastic_training(training_platform, agent_list, learning_rate_theta, lear
         dm_outcome, prior_outcome, nb_outcome, dr_outcome, loss = stochastic_iterative_policy(action_num, prior_red_list, pr_red_ball_red_bucket,
                                                     pr_red_ball_blue_bucket, agent_list, t, decay_rate, score_func,
                                                     decision_rule, preferred_colour_pr_list, signal_size_list)
-        for action_no in range(action_num):
-            metric_dict[f'action_{action_no}_pred'].append(final_prediction[action_no])
-            metric_dict[f'bayesian_{action_no}_pred'].append(bayesian_prediction[action_no])
+        if t % evaluation_step == 0:
+            for action_no in range(action_num):
+                metric_dict[f'action_{action_no}_pred'].append(final_prediction[action_no])
+                metric_dict[f'bayesian_{action_no}_pred'].append(bayesian_prediction[action_no])
 
-        metric_dict['dm_arm'].append(arm)
-        metric_dict['dm_outcome'].append(dm_outcome)
-        metric_dict['prior_outcome'].append(prior_outcome)
-        metric_dict['bayesian_outcome'].append(nb_outcome)
-        metric_dict['dr_outcome'].append(dr_outcome)
-        metric_dict['loss'].append(loss)
+            metric_dict['dm_arm'].append(arm)
+            metric_dict['dm_outcome'].append(dm_outcome)
+            metric_dict['prior_outcome'].append(prior_outcome)
+            metric_dict['bayesian_outcome'].append(nb_outcome)
+            metric_dict['dr_outcome'].append(dr_outcome)
+            metric_dict['loss'].append(loss)
 
     return metric_dict
 
@@ -277,6 +278,7 @@ def deterministic_iterative_policy(action_num, prior_red_list, pr_red_ball_red_b
 
 
 if __name__ == '__main__':
+    training_platform = TrainingPlatform.Python
     learning_rate_theta = 1e-4
     learning_rate_wv = 1e-4
     memory_size = 16
@@ -302,8 +304,9 @@ if __name__ == '__main__':
     weights_init = WeightsInit.ZERO
     report_order = ReportOrder.RANDOM
     signal_size_list = [1, 1]
+    agent_list = []
 
-    stochastic_training(learning_rate_theta, learning_rate_wv,
+    stochastic_training(training_platform, agent_list, learning_rate_theta, learning_rate_wv,
                         memory_size, batch_size, training_episodes,
                         decay_rate, beta1, beta2, algorithm, learning_std,
                         fixed_std, pr_red_ball_red_bucket, pr_red_ball_blue_bucket,
