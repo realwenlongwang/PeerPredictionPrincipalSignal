@@ -49,14 +49,6 @@ class Agent:
         self.evaluating = True
         self.evaluation_step = evaluation_step
 
-    def signal_encode(self, bucket_no, ball, current_prediction):
-        encoded_signal = np.zeros(shape=(1, self.feature_num * self.action_num))
-        encoded_signal[0, bucket_no * self.feature_num + ball.value] = 1
-        prior_index = np.arange(start=2, stop=self.feature_num * self.action_num, step=self.feature_num)
-
-        encoded_signal[0, prior_index] = logit(current_prediction)
-        return encoded_signal
-
     def mean_gradients_history_df(self):
         column_name_list = []
         for bucket_name in self.bucket_name_list:
@@ -166,7 +158,7 @@ class StochasticGradientAgent(Agent):
         self.fixed_std = fixed_std
         self.std_learning_rate_mask = np.ones((1, action_num))
         # Critic weights
-        self.w_v = np.zeros((feature_num * action_num, action_num))
+        self.w_v = np.zeros((feature_num * action_num, 1))
         self.learning_rate_wv = learning_rate_wv
 
         # Momentum variables
@@ -235,10 +227,10 @@ class StochasticGradientAgent(Agent):
         print('Updating weights with ' + self.algorithm.value + ' algorithm.')
         print('='*30)
 
-    def store_experience(self, t, signal_array, h_array, mean_array, std_array, reward_array):
+    def store_experience(self, t, signal_array, h_array, mean_array, std_array, reward):
 
-        v_array = np.matmul(signal_array, self.w_v)
-        delta = reward_array.sum() - v_array
+        v = np.squeeze(np.matmul(signal_array, self.w_v))[()]
+        delta = reward - v
 
         idx = t % self.memory_size
         self.memory[idx, 0, :self.feature_num * self.action_num] = signal_array
@@ -247,9 +239,8 @@ class StochasticGradientAgent(Agent):
         (self.feature_num + 1) * self.action_num:(self.feature_num + 2) * self.action_num] = mean_array
         self.memory[idx, 0,
         (self.feature_num + 2) * self.action_num:(self.feature_num + 3) * self.action_num] = std_array
-        self.memory[idx, 0,
-        (self.feature_num + 3) * self.action_num:(self.feature_num + 4) * self.action_num] = reward_array.sum()
-        self.memory[idx, 0, (self.feature_num + 4) * self.action_num:(self.feature_num + 5) * self.action_num] = delta
+        self.memory[idx, 0, (self.feature_num + 3) * self.action_num] = reward
+        self.memory[idx, 0, (self.feature_num + 4) * self.action_num] = delta
 
         if self.evaluating and (t % self.evaluation_step == 0):
             entry = {
@@ -258,10 +249,10 @@ class StochasticGradientAgent(Agent):
                     'bucket_1_blue': signal_array[0, 4], 'bucket_1_prior': signal_array[0, 5]
             }
             self.reward_history_list.append(entry)
+            self.reward_history_list[-1][f'score'] = reward
+            self.reward_history_list[-1][f'v'] = v
 
-            for bucket_no, reward, v in zip(range(self.action_num), reward_array.ravel(), v_array.ravel()):
-                self.reward_history_list[-1][f'score_{bucket_no}'] = reward
-                self.reward_history_list[-1][f'v_{bucket_no}'] = v
+        for bucket_no in range(self.action_num):
                 self.mean_weights_history_list[bucket_no].append(self.theta_mean[:, bucket_no].copy().ravel())
                 if self.learning_std:
                     self.std_weights_history_list[bucket_no].append(self.theta_std[:, bucket_no].copy().ravel())
@@ -293,9 +284,9 @@ class StochasticGradientAgent(Agent):
                 (self.feature_num + 1) * self.action_num:(self.feature_num + 2) * self.action_num]
         stds = experience_batch[:, :, (self.feature_num + 2) * self.action_num:(self.feature_num + 3) * self.action_num]
         rewards = experience_batch[:, :,
-                  (self.feature_num + 3) * self.action_num:(self.feature_num + 4) * self.action_num]
+                  [(self.feature_num + 3) * self.action_num]]
         deltas = experience_batch[:, :,
-                 (self.feature_num + 4) * self.action_num:(self.feature_num + 5) * self.action_num]
+                 [(self.feature_num + 4) * self.action_num]]
 
         # prs = expit(hs)
         batch_gradient_means = np.matmul(signal_array, deltas * ((hs - means) / np.power(stds, 2))) #* prs * (1 - prs)

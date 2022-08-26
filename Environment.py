@@ -2,7 +2,6 @@ import numpy as np
 from scipy.special import expit, logit
 from scipy import stats
 import pandas as pd
-import matplotlib.pyplot as plt
 from enum import Enum
 from numpy.random import Generator, PCG64
 
@@ -129,15 +128,21 @@ class DecisionMarket:
         for pm, pi, mu in zip(self.conditional_market_list, np.squeeze(sampled_predictions), np.squeeze(mean_predictions)):
             pm.report(np.asscalar(pi), np.asscalar(mu))
 
-    def log_resolve(self, buckets):
+    def resolve(self, score_func, buckets):
         if self.decision_rule == DecisionRule.DETERMINISTIC or self.conditional_market_num == 1:
             current_price_list = self.read_current_pred()
             index = np.argmax(current_price_list)
             conditional_market, bucket = self.conditional_market_list[index], buckets[index]
             agent_num = len(conditional_market.sampled_prediction_history) - 1  # minus the initial report
-            reward_array = np.zeros(shape=(agent_num, self.conditional_market_num))
-            reward_array[:, index] = conditional_market.log_resolve(bucket.colour.value)
-            return reward_array, index
+            # reward_array = np.zeros(shape=(agent_num, self.conditional_market_num))
+            # reward_array[:, index] = conditional_market.log_resolve(bucket.colour.value)
+            if score_func == ScoreFunction.LOG:
+                reward_array = conditional_market.log_resolve(bucket.colour.value)
+            elif score_func == ScoreFunction.QUADRATIC:
+                reward_array = conditional_market.brier_resolve(bucket.colour.value)
+            else:
+                raise ValueError('The score function does not exist.')
+
         else:
             # TODO: consider move the generator initialisation outside and init once only. May speed up training.
             generator = Generator(PCG64())
@@ -148,42 +153,16 @@ class DecisionMarket:
             index = conditional_market.no
             bucket = buckets[index]
             agent_num = len(conditional_market.sampled_prediction_history) - 1 # minus the initial report
-            reward_array = np.zeros(shape=(agent_num, self.conditional_market_num))
-            reward_array[:, index] = conditional_market.log_resolve(bucket.colour.value) / pr
-            return reward_array, index
+            # reward_array = np.zeros(shape=(agent_num, self.conditional_market_num))
+            # reward_array[:, index] = conditional_market.log_resolve(bucket.colour.value) / pr
+            if score_func == ScoreFunction.LOG:
+                reward_array = conditional_market.log_resolve(bucket.colour.value) / pr
+            elif score_func == ScoreFunction.QUADRATIC:
+                reward_array = conditional_market.brier_resolve(bucket.colour.value) / pr
+            else:
+                raise ValueError('The score function does not exist.')
 
-    def brier_resolve(self, buckets):
-        if self.decision_rule == DecisionRule.DETERMINISTIC  or self.conditional_market_num == 1:
-            current_price_list = self.read_current_pred()
-            index = np.argmax(current_price_list)
-            conditional_market, bucket = self.conditional_market_list[index], buckets[index]
-            agent_num = len(conditional_market.sampled_prediction_history) - 1  # minus the initial report
-            reward_array = np.zeros(shape=(agent_num, self.conditional_market_num))
-            reward_array[:, index] = conditional_market.brier_resolve(bucket.colour.value)
-            return reward_array, index
-        else:
-            # TODO: consider move the generator initialisation outside and init once only. May speed up training.
-            generator = Generator(PCG64())
-            sorted_market_list = sorted(self.conditional_market_list, key=lambda market: market.current_prediction,
-                                        reverse=True)
-            pr, conditional_market = generator.choice(list(zip(self.preferred_colour_pr_list, sorted_market_list)),
-                                                      p=self.preferred_colour_pr_list)
-            index = conditional_market.no
-            bucket = buckets[index]
-            agent_num = len(conditional_market.sampled_prediction_history) - 1 # minus the initial report
-            reward_array = np.zeros(shape=(agent_num, self.conditional_market_num))
-            reward_array[:, index] = conditional_market.brier_resolve(bucket.colour.value) / pr
-            return reward_array, index
-
-    def resolve(self, score_func, buckets):
-        if score_func == ScoreFunction.LOG:
-            return self.log_resolve(buckets)
-        elif score_func == ScoreFunction.QUADRATIC:
-            return self.brier_resolve(buckets)
-        else:
-            raise ValueError('The score function does not exist.')
-
-
+        return reward_array, index
 
     def read_current_pred(self):
         current_price_list = list(pm.current_prediction for pm in self.conditional_market_list)
@@ -363,24 +342,6 @@ def expected_log_reward_blue_ball(actual_pr_ru_bs, estimated_pr_ru_bs, pr_ru):
             np.log(1 - estimated_pr_ru_bs) - np.log(1 - pr_ru))
 
 
-# TODO: How to compute the regret for second agent?
-# def compute_regret(signal_array, pi, prior_red, pr_red_ball_red_bucket, pr_red_ball_blue_bucket):
-#     if signal_array == 'red':
-#         actual_pr_ru_S = analytical_best_report_ru_rs(pr_ru=prior_red, pr_rs_ru=pr_red_ball_red_bucket,
-#                                                       pr_rs_bu=pr_red_ball_blue_bucket)
-#         expected_log_reward = expected_log_reward_red_ball(actual_pr_ru_rs=actual_pr_ru_S, estimated_pr_ru_rs=pi,
-#                                                            pr_ru=prior_red)
-#         max_expected_log_reward = expected_log_reward_red_ball(actual_pr_ru_rs=actual_pr_ru_S,
-#                                                                estimated_pr_ru_rs=actual_pr_ru_S, pr_ru=prior_red)
-#     else:
-#         actual_pr_ru_S = analytical_best_report_ru_bs(pr_ru=prior_red, pr_bs_ru=1 - pr_red_ball_red_bucket,
-#                                                       pr_bs_bu=1 - pr_red_ball_blue_bucket)
-#         expected_log_reward = expected_log_reward_blue_ball(actual_pr_ru_bs=actual_pr_ru_S, estimated_pr_ru_bs=pi,
-#                                                             pr_ru=prior_red)
-#         max_expected_log_reward = expected_log_reward_blue_ball(actual_pr_ru_bs=actual_pr_ru_S,
-#                                                                 estimated_pr_ru_bs=actual_pr_ru_S, pr_ru=prior_red)
-#     return max_expected_log_reward - expected_log_reward
-
 def analytical_best_report(bucket_no, ball_colour, current_prediction, pr_red_ball_red_bucket, pr_red_ball_blue_bucket):
     if ball_colour == Ball.RED:
         report = analytical_best_report_ru_rs(current_prediction[bucket_no], pr_red_ball_red_bucket,
@@ -401,12 +362,13 @@ def no_outlier_df(df, thresh=3):
     return df[(np.abs(stats.zscore(df)) < thresh).all(axis=1)]
 
 
-def signal_encode(bucket_no, ball, action_num, current_prediction):
-    encoded_signal = np.zeros(shape=(1, 3 * action_num))
-    encoded_signal[0, bucket_no * 3 + ball.value] = 1
-    prior_index = np.arange(start=2, stop=3 * action_num, step=3)
-    encoded_signal[0, prior_index] = logit(current_prediction)
-    return encoded_signal
+def signal_encode(ball_colour, bucket_no, prior_pair):
+    ball_col_val_map = {'red': 0, 'blue': 1}
+    signal_mat = np.zeros((1, 6))
+    signal_mat[0, [2, 5]] = np.squeeze(prior_pair)
+    signal_mat[0, bucket_no * 3 + ball_col_val_map[ball_colour]] += 1
+
+    return signal_mat
 
 
 def one_hot_encode(feature):

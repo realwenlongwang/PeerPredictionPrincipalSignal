@@ -87,12 +87,12 @@ def stochastic_iterative_policy(action_num, prior_red_list, pr_red_ball_red_buck
         signal_mat[0, prior_index] = logit_pos
         logit_pos = BayesianUpdateMat(signal_mat, pr_red_ball_red_bucket, pr_red_ball_blue_bucket)
 
-    rewards_array, arm = dm.resolve(score_func, buckets.bucket_list)
+    reward_array, arm = dm.resolve(score_func, buckets.bucket_list)
 
     # learning
-    for agent, reward_array, experience in zip(agent_list, rewards_array, experience_list):
+    for agent, reward, experience in zip(agent_list, reward_array, experience_list):
 
-        experience.append(reward_array)
+        experience.append(reward)
         agent.store_experience(*experience)
         try:
             agent.batch_update(t)
@@ -102,10 +102,9 @@ def stochastic_iterative_policy(action_num, prior_red_list, pr_red_ball_red_buck
 
         agent.learning_rate_decay(epoch=t, decay_rate=decay_rate)
 
-
     final_prediction = expit(dm.read_current_pred())
     bayesian_prediction = expit(logit_pos)
-    loss = np.sqrt(np.mean(np.square(np.log(bayesian_prediction) - np.log(final_prediction))))
+    loss = np.sqrt(np.mean(np.square(bayesian_prediction - final_prediction)))
     dm_outcome = buckets.bucket_list[arm].colour == BucketColour.RED
     # Evaluation_purpose:
     dr_arm = np.argmax(final_prediction)
