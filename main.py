@@ -8,7 +8,8 @@ from PolicyGradientAgent import StochasticGradientAgent, DeterministicGradientAg
 # import line_profiler
 
 
-def stochastic_training(training_platform, agent_list, learning_rate_theta, learning_rate_wv,
+def stochastic_training(
+        training_platform, agent_list, learning_rate_theta, learning_rate_wv,
                                  memory_size, batch_size, training_episodes,
                                  decay_rate, beta1, beta2, algorithm, learning_std,
                                  fixed_std, pr_red_ball_red_bucket, pr_red_ball_blue_bucket,
@@ -112,7 +113,7 @@ def stochastic_iterative_policy(action_num, prior_red_list, pr_red_ball_red_buck
     ####################
     prior_arm = np.argmax(prior_red_instances)
     prior_outcome = buckets.bucket_list[prior_arm].colour == BucketColour.RED
-    nb_arm = np.argmax(expit(logit_pos))
+    nb_arm = np.argmax(bayesian_prediction)
     nb_outcome = buckets.bucket_list[nb_arm].colour == BucketColour.RED
 
     return final_prediction, bayesian_prediction, \
@@ -120,8 +121,8 @@ def stochastic_iterative_policy(action_num, prior_red_list, pr_red_ball_red_buck
            nb_outcome, dr_outcome, loss
 
 
-def deterministic_training_notebook(
-        agent_list, feature_num, action_num,
+def deterministic_training(
+        training_platform, agent_list, feature_num, action_num,
         learning_rate_theta, learning_rate_wv, learning_rate_wq,
         memory_size, batch_size, training_episodes,
         decay_rate, beta1, beta2, algorithm, pr_red_ball_red_bucket,
@@ -147,74 +148,47 @@ def deterministic_training_notebook(
             agent.evaluation_init(pr_red_ball_red_bucket, pr_red_ball_blue_bucket, evaluation_step)
             agent_list.append(agent)
 
-    explorer = Explorer(feature_num=3, action_num=action_num, learning=explorer_learning, init_learning_rate=3e-4,
+    explorer = Explorer(feature_num=feature_num, action_num=action_num, learning=explorer_learning, init_learning_rate=3e-4,
                         min_std=0.1)
 
-    loss_list = []
-    dm_outcome_list = []
-    prior_outcome_list = []
-    nb_outcome_list = []
+    metric_dict = {}
+    metric_dict['loss'] = []
+    for action_no in range(action_num):
+        metric_dict[f'action_{action_no}_pred'] = []
+        metric_dict[f'bayesian_{action_no}_pred'] = []
+    metric_dict['dm_outcome'] = []
+    metric_dict['prior_outcome'] = []
+    metric_dict['bayesian_outcome'] = []
+    metric_dict['dr_outcome'] = [] # consider delete in the future
+    metric_dict['dm_arm'] = []
 
-    for t in tnrange(training_episodes):
+    iter_range = tnrange(training_episodes) if training_platform == TrainingPlatform.Notebook else trange(
+        training_episodes)
+
+    for t in iter_range:
         if report_order == ReportOrder.RANDOM:
             np.random.shuffle(agent_list)
-        dm_outcome, prior_outcome, nb_outcome, loss = deterministic_iterative_policy(
+        final_prediction, bayesian_prediction, arm, \
+        dm_outcome, prior_outcome, nb_outcome, dr_outcome, loss = deterministic_iterative_policy(
             action_num, prior_red_list, pr_red_ball_red_bucket,
             pr_red_ball_blue_bucket, agent_list, explorer,
             t, decay_rate, fixed_std, score_func, decision_rule,
             preferred_colour_pr_list, signal_size_list
         )
-        dm_outcome_list.append(dm_outcome)
-        prior_outcome_list.append(prior_outcome)
-        nb_outcome_list.append(nb_outcome)
-        loss_list.append(loss)
+        if t % evaluation_step == 0:
+            for action_no in range(action_num):
+                metric_dict[f'action_{action_no}_pred'].append(final_prediction[action_no])
+                metric_dict[f'bayesian_{action_no}_pred'].append(bayesian_prediction[action_no])
 
-    return agent_list, dm_outcome_list, prior_outcome_list, nb_outcome_list, loss_list
+            metric_dict['dm_arm'].append(arm)
+            metric_dict['dm_outcome'].append(dm_outcome)
+            metric_dict['prior_outcome'].append(prior_outcome)
+            metric_dict['bayesian_outcome'].append(nb_outcome)
+            metric_dict['dr_outcome'].append(dr_outcome)
+            metric_dict['loss'].append(loss)
 
+    return metric_dict
 
-def deterministic_training(
-        feature_num, action_num,
-        learning_rate_theta, learning_rate_wv, learning_rate_wq,
-        memory_size, batch_size, training_episodes,
-        decay_rate, beta1, beta2, algorithm, pr_red_ball_red_bucket,
-        pr_red_ball_blue_bucket, prior_red_list, agent_num, explorer_learning,
-        fixed_std, score_func, decision_rule, preferred_colour_pr_list,
-        evaluation_step, weight_init, report_order, signal_size_list):
-    agent_list = []
-
-    for i in range(agent_num):
-        agent = DeterministicGradientAgent(
-            feature_num=feature_num, action_num=action_num, learning_rate_theta=learning_rate_theta,
-            learning_rate_wv=learning_rate_wv, learning_rate_wq=learning_rate_wq,
-            memory_size=memory_size, batch_size=batch_size,
-            beta1=beta1, beta2=beta2, name='agent' + str(i),
-            algorithm=algorithm, weights_init=weight_init
-        )
-        agent.evaluation_init(pr_red_ball_red_bucket, pr_red_ball_blue_bucket, evaluation_step)
-        agent_list.append(agent)
-
-    loss_list = []
-    dm_outcome_list = []
-    prior_outcome_list = []
-    nb_outcome_list = []
-
-    explorer = Explorer(feature_num=3, action_num=action_num, learning=explorer_learning, init_learning_rate=3e-4,
-                        min_std=0.1)
-
-    for t in trange(training_episodes):
-        if report_order == ReportOrder.RANDOM:
-            np.random.shuffle(agent_list)
-        dm_outcome, prior_outcome, nb_outcome, loss = deterministic_iterative_policy(
-            action_num, prior_red_list, pr_red_ball_red_bucket,
-            pr_red_ball_blue_bucket, agent_list, explorer,
-            t, decay_rate, fixed_std, score_func, decision_rule, preferred_colour_pr_list, signal_size_list
-        )
-        dm_outcome_list.append(dm_outcome)
-        prior_outcome_list.append(prior_outcome)
-        nb_outcome_list.append(nb_outcome)
-        loss_list.append(loss)
-
-    return agent_list, dm_outcome_list, prior_outcome_list, loss_list
 
 def deterministic_iterative_policy(action_num, prior_red_list, pr_red_ball_red_bucket, pr_red_ball_blue_bucket,
                                    agent_list, explorer, t, decay_rate, fixed_std, score_func, decision_rule,
@@ -265,15 +239,21 @@ def deterministic_iterative_policy(action_num, prior_red_list, pr_red_ball_red_b
         #     if explorer.learning:
         #         explorer.learning_rate_decay(epoch=t, decay_rate=0.001)
 
-    final_predictions = expit(dm.read_current_pred())
-    loss = np.sum(np.square(expit(logit_pos) - final_predictions))
+    final_prediction = expit(dm.read_current_pred())
+    bayesian_prediction = expit(logit_pos)
+    loss = np.sqrt(np.mean(np.square(bayesian_prediction - final_prediction)))
     dm_outcome = buckets.bucket_list[arm].colour == BucketColour.RED
+    # Evaluation_purpose:
+    dr_arm = np.argmax(final_prediction)
+    dr_outcome = buckets.bucket_list[dr_arm].colour == BucketColour.RED
     prior_arm = np.argmax(prior_red_instances)
     prior_outcome = buckets.bucket_list[prior_arm].colour == BucketColour.RED
-    nb_arm = np.argmax(expit(logit_pos))
+    nb_arm = np.argmax(bayesian_prediction)
     nb_outcome = buckets.bucket_list[nb_arm].colour == BucketColour.RED
 
-    return dm_outcome, prior_outcome, nb_outcome, loss
+    return final_prediction, bayesian_prediction, \
+           arm, dm_outcome, prior_outcome,\
+           nb_outcome, dr_outcome, loss
 
 
 if __name__ == '__main__':

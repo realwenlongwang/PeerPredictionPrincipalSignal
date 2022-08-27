@@ -31,7 +31,7 @@ learning_rate_theta = 1e-4 / signal_size
 learning_rate_wv = 1e-4 / signal_size
 memory_size = 16
 batch_size = 16
-training_episodes = int(8e5)
+training_episodes = int(8e6)
 decay_rate = 0
 beta1 = 0.9
 beta2 = 0.9999
@@ -43,11 +43,11 @@ pr_red_ball_red_bucket = 2/3
 pr_red_ball_blue_bucket = 1/3
 # prior_red_list = logit([2/3, 1/2, 1/3])
 
-preferred_colour_pr_list = [0.99, 0.01]
+preferred_colour_pr_list = [0.9, 0.1]
 score_func = ScoreFunction.LOG
 decision_rule = DecisionRule.DETERMINISTIC
 evaluation_step = 10
-weights_init = WeightsInit.CUSTOMISED
+weights_init = WeightsInit.RANDOM
 report_order = ReportOrder.FIXED
 signal_size_list = np.ones(shape=agent_num, dtype=int) * signal_size
 

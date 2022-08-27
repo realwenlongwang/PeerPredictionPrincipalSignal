@@ -470,7 +470,7 @@ class DeterministicGradientAgent(Agent):
 
         # Critic weights
         self.w_q = np.zeros((feature_num * action_num, action_num))
-        self.w_v = np.zeros((feature_num * action_num, action_num))
+        self.w_v = np.zeros((feature_num * action_num, 1))
         self.learning_rate_wv = learning_rate_wv
         self.learning_rate_wq = learning_rate_wq
 
@@ -484,7 +484,7 @@ class DeterministicGradientAgent(Agent):
         self.s_dw_mean = np.zeros((feature_num * action_num, action_num))
 
         # Experience replay
-        self.memory = np.zeros((memory_size, 1, (self.feature_num + 1) * self.action_num))  # signal_array, action
+        self.memory = np.zeros((memory_size, 1, (self.feature_num + 1) * self.action_num + 1))  # signal_array, action
         self.w_q_memory = np.zeros((memory_size, feature_num * action_num, action_num))
         self.phi_memory = np.zeros((memory_size, feature_num * action_num, action_num))
         self.batch_size = batch_size
@@ -493,8 +493,8 @@ class DeterministicGradientAgent(Agent):
         # Evaluation
         self.q_gradients_history_list = list([] for i in range(action_num))
         self.q_weights_history_list = list([] for i in range(action_num))
-        self.v_gradients_history_list = list([] for i in range(action_num))
-        self.v_weights_history_list = list([] for i in range(action_num))
+        self.v_gradients_history_list = list()
+        self.v_weights_history_list = list()
 
         self.__print_info()
 
@@ -528,36 +528,38 @@ class DeterministicGradientAgent(Agent):
         print('Updating weights with ' + self.algorithm.value + ' algorithm.')
         print('=' * 30)
 
-    def store_experience(self, t, signal_array, h_array, mean_array, reward_array):
+    def store_experience(self, t, signal_array, h_array, mean_array, reward):
 
         idx = t % self.memory_size
 
         phi_array = np.matmul(signal_array.T, (h_array - mean_array))
 
-        v_array = np.matmul(signal_array, self.w_v)
-        q_array = np.sum(phi_array * self.w_q, axis=0, keepdims=True) + v_array
+        v = np.squeeze(np.matmul(signal_array, self.w_v))[()]
+        q_array = np.sum(phi_array * self.w_q, axis=0, keepdims=True) + v
+        delta_v = reward - v
+        delta_q = reward - q_array
 
         self.memory[idx, 0, :self.feature_num * self.action_num] = signal_array
-        self.memory[idx, 0, self.feature_num * self.action_num:(self.feature_num + 1) * self.action_num] = reward_array - q_array
+        self.memory[idx, 0, self.feature_num * self.action_num:(self.feature_num + 1) * self.action_num] = delta_q
+        self.memory[idx, 0, (self.feature_num + 1) * self.action_num] = delta_v
         self.w_q_memory[idx] = self.w_q.copy()
         self.phi_memory[idx] = phi_array
         # self.memory[idx, 8:11] = self.theta_mean
         # self.memory[idx, 11:] = self.w_v
 
         if self.evaluating and (t % self.evaluation_step == 0):
-            for bucket_no, reward, v, q in zip(range(self.action_num), reward_array.ravel(), v_array.ravel(),
-                                               q_array.ravel()):
-                # self.reward_history_list[-1].append(reward)
-                # self.reward_history_list[-1].append(v)
-                # self.reward_history_list[-1].append(q)
-                # self.reward_history_list[-1].append(compute_regret(
-                #     signal_array=one_hot_decode(signal_array[:2]),
-                #     pi=expit(h_array),
-                #     prior_red=signal_array[2],
-                #     pr_red_ball_red_bucket=self.pr_red_ball_red_bucket,
-                #     pr_red_ball_blue_bucket=self.pr_red_ball_blue_bucket))
+            entry = {
+                    'bucket_0_red': signal_array[0, 0], 'bucket_0_blue': signal_array[0, 1],
+                    'bucket_0_prior': signal_array[0, 2], 'bucket_1_red': signal_array[0, 3],
+                    'bucket_1_blue': signal_array[0, 4], 'bucket_1_prior': signal_array[0, 5]
+            }
+            self.reward_history_list.append(entry)
+            self.reward_history_list[-1][f'score'] = reward
+            self.reward_history_list[-1][f'v'] = v
+            self.v_weights_history_list.append(self.w_v.copy().ravel())
+            for bucket_no in range(self.action_num):
                 self.mean_weights_history_list[bucket_no].append(self.theta_mean[:, bucket_no].copy().ravel())
-                self.v_weights_history_list[bucket_no].append(self.w_v[:, bucket_no].copy().ravel())
+
                 self.q_weights_history_list[bucket_no].append(self.w_q[:, bucket_no].copy().ravel())
 
     def __sample_experience_index(self, t):
@@ -581,7 +583,8 @@ class DeterministicGradientAgent(Agent):
         experience_batch = self.memory[idx]
 
         signal_array = experience_batch[:, :, :self.feature_num * self.action_num].transpose((0, 2, 1))
-        deltas = experience_batch[:, :, self.feature_num * self.action_num:(self.feature_num + 1) * self.action_num]
+        delta_qs = experience_batch[:, :, self.feature_num * self.action_num:(self.feature_num + 1) * self.action_num]
+        delta_vs = experience_batch[:, :, [(self.feature_num + 1) * self.action_num]]
         phis = self.phi_memory[idx]
         w_qs = self.w_q_memory[idx]
 
@@ -589,8 +592,8 @@ class DeterministicGradientAgent(Agent):
         # batch_gradient_means = signals * np.dot(signals, self.w_q.T)
         batch_gradient_means = w_qs  # Natural gradient
         # batch_gradient_means = self.w_q
-        batch_gradient_q = deltas * phis
-        batch_gradient_v = np.matmul(signal_array, deltas)
+        batch_gradient_q = delta_qs * phis
+        batch_gradient_v = np.matmul(signal_array, delta_vs)
 
         gradient_mean = np.mean(batch_gradient_means, axis=0, keepdims=False)
         gradient_q = np.mean(batch_gradient_q, axis=0, keepdims=False)
@@ -630,7 +633,7 @@ class DeterministicGradientAgent(Agent):
         if self.evaluating and (t % self.evaluation_step == 0):
             for bucket_no in range(self.action_num):
                 self.mean_gradients_history_list[bucket_no].append(gradient_mean[:, bucket_no].ravel())
-                self.v_gradients_history_list[bucket_no].append(gradient_v[:, bucket_no].ravel())
+                # self.v_gradients_history_list[bucket_no].append(gradient_v[:, bucket_no].ravel())
                 self.q_gradients_history_list[bucket_no].append(gradient_q[:, bucket_no].ravel())
 
     def reward_history_dataframe(self):
