@@ -157,7 +157,7 @@ class StochasticGradientAgent(Agent):
         self.learning_std = learning_std
         self.fixed_std = fixed_std
         self.std_learning_rate_mask = np.ones((1, action_num))
-        # Critic weights
+        # Baseline weights
         self.w_v = np.zeros((feature_num * action_num, 1))
         self.learning_rate_wv = learning_rate_wv
 
@@ -183,7 +183,7 @@ class StochasticGradientAgent(Agent):
 
         self.__print_info()
 
-    def report(self, signal, t):
+    def report(self, signal):
 
         mean_array = np.matmul(signal, self.theta_mean)
         if self.learning_std:
@@ -194,25 +194,6 @@ class StochasticGradientAgent(Agent):
 
         h_array = np.random.normal(loc=mean_array, scale=std_array)
 
-        # if np.any(np.isnan(h_array)):
-        #     print('h_array: ', h_array)
-        #     print('mean_array:', mean_array)
-        #     print('std_array:', std_array)
-        #     raise AssertionError('Warning: report is None !!!')
-
-        # if self.evaluating and (t % self.evaluation_step == 0):
-        #     for i, h, mean, std in zip(range(self.action_num), h_array.ravel(),
-        #                                    mean_array.ravel(), std_array.ravel()):
-        #         self.report_history_list[-1].append(pr)
-        #         self.report_history_list[-1].append(expit(h))
-        #         self.report_history_list[-1].append(expit(mean))
-        #         if bucket_no == i:
-        #             best_report = analytical_best_report(bucket_no, ball_colour, current_prediction,
-        #                                                  self.pr_red_ball_red_bucket, self.pr_red_ball_blue_bucket)
-        #         else:
-        #             best_report = current_prediction[i]
-        #         self.report_history_list[-1].append(best_report)
-        #         self.report_history_list[-1].append(std)
         return signal, h_array, mean_array, std_array
 
     def __print_info(self):
@@ -498,26 +479,10 @@ class DeterministicGradientAgent(Agent):
 
         self.__print_info()
 
-    def report(self, signal, t):
+    def report(self, signal):
 
         mean_array = np.matmul(signal, self.theta_mean)
 
-        # if np.any(np.isnan(mean_array)):
-        #     print('mean_array:', mean_array)
-        #     raise AssertionError('Warning: report is None !!!')
-
-        # if self.evaluating and (t % self.evaluation_step == 0):
-        #     self.report_history_list.append([bucket_no, ball_colour])
-        #     self.reward_history_list.append([bucket_no, ball_colour])
-        #     for i, pr, mean in zip(range(self.action_num), current_prediction, mean_array.ravel()):
-        #         self.report_history_list[-1].append(pr)
-        #         self.report_history_list[-1].append(expit(mean))
-        #         if bucket_no == i:
-        #             best_report = analytical_best_report(bucket_no, ball_colour, current_prediction,
-        #                                                  self.pr_red_ball_red_bucket, self.pr_red_ball_blue_bucket)
-        #         else:
-        #             best_report = current_prediction[i]
-        #         self.report_history_list[-1].append(best_report)
         return signal, mean_array
 
     def __print_info(self):

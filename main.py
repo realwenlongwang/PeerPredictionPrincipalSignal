@@ -82,7 +82,7 @@ def stochastic_iterative_policy(action_num, prior_red_list, pr_red_ball_red_buck
         current_predictions = dm.read_current_pred()
         prior_index = np.arange(start=2, stop=3 * action_num, step=3)
         signal_mat[0, prior_index] = current_predictions
-        signal_array, h_array, mean_array, std_array = agent.report(signal_mat, t)
+        signal_array, h_array, mean_array, std_array = agent.report(signal_mat)
         dm.report(h_array, mean_array)
         experience_list.append([t, signal_array.copy(), h_array.copy(), mean_array.copy(), std_array.copy()])
         signal_mat[0, prior_index] = logit_pos
@@ -212,7 +212,7 @@ def deterministic_iterative_policy(action_num, prior_red_list, pr_red_ball_red_b
         current_predictions = dm.read_current_pred()
         prior_index = np.arange(start=2, stop=3 * action_num, step=3)
         signal_mat[0, prior_index] = current_predictions
-        signal_array, mean_array = agent.report(signal_mat, t)
+        signal_array, mean_array = agent.report(signal_mat)
         explorer.set_parameters(mean_array=mean_array, fixed_std=fixed_std)
         e_h_array = explorer.report(signal_array)
         dm.report(e_h_array, mean_array)

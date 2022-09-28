@@ -265,7 +265,7 @@ for learning_rate_wq in [1e-4, 3e-4, 1e-3, 3e-3, 1e-2]:
                 signal_array = signal_encode(ball_col, bucket_i, prev_reports)
                 reports = context_weights_report(signal_array, weight_mat)
                 ba_signal_array = signal_encode(ball_col, bucket_i, prev_ba_reports)
-                ba_reports = BayesianUpdateMat(signal_array, pr_red_ball_red_bucket, pr_red_ball_blue_bucket)
+                ba_reports = BayesianUpdateMat(ba_signal_array, pr_red_ball_red_bucket, pr_red_ball_blue_bucket)
                 
                 axs[ag_i, bucket_i].scatter(expit(reports[0, 0]), expit(reports[0, 1]), marker='o', color=ball_col, label=f'{ball_col} DM')
                 axs[ag_i, bucket_i].scatter(expit(ba_reports[0]), expit(ba_reports[1]), marker='o', color=f'dark{ball_col}', label=f'{ball_col} Bayesian')
@@ -327,7 +327,13 @@ for learning_rate_wq in [1e-4, 3e-4, 1e-3, 3e-3, 1e-2]:
     plt.savefig(dir_path + 'vq.png', bbox_inches='tight')
 
 
+    # clear memory for next iteration
+    del agent_list
+    del metric_dict
+    del metric_df
+    del rolling_df
 
+    gc.collect()
 
 
 
