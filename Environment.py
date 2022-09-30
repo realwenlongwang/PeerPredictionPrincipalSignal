@@ -67,6 +67,16 @@ def BayesianUpdateMat(signal_mat, pr_rs_ru, pr_rs_bu):
     logit_pos = np.squeeze(np.matmul(signal_mat, theta))
     return logit_pos
 
+
+def BayesianPeerPrediction(prior, signal, bucket_no, pr_rs_ru, pr_rs_bu):
+    posterior = np.array(prior)
+    if signal.name == 'RED':
+        posterior[bucket_no] = prior[bucket_no] * pr_rs_ru + (1 - prior[bucket_no]) * pr_rs_bu
+    else:
+        posterior[bucket_no] = prior[bucket_no] * (1 - pr_rs_ru) + (1 - prior[bucket_no]) * (1 - pr_rs_bu)
+
+    return posterior
+
 class PredictionMarket:
 
     def __init__(self, no, prior_red):
@@ -112,6 +122,40 @@ class PredictionMarket:
             return self.brier_resolve(materialised_index)
         else:
             raise ValueError('The score function does not exist.')
+
+
+class PeerDecision:
+    def __init__(self, action_num, prior_red_instances, preferred_colour):
+        self.conditional_market_num = action_num
+        self.conditional_market_list = list(PredictionMarket(no, prior_red) for no, prior_red in
+                                            zip(range(self.conditional_market_num), prior_red_instances))
+        self.preferred_colour = preferred_colour
+
+    def report(self, sampled_predictions, mean_predictions):
+        for pm, pi, mu in zip(self.conditional_market_list, np.squeeze(sampled_predictions), np.squeeze(mean_predictions)):
+            pm.report(np.asscalar(pi), np.asscalar(mu))
+
+    def resolve(self, score_func, principal_signal):
+
+        current_price_list = self.read_current_pred()
+        ball, bucket_no, prior_pair = two_action_signal_decode(principal_signal)
+        conditional_market = self.conditional_market_list[bucket_no]
+        agent_num = len(conditional_market.sampled_prediction_history) - 1  # minus the initial report
+        # reward_array = np.zeros(shape=(agent_num, self.conditional_market_num))
+        # reward_array[:, index] = conditional_market.log_resolve(bucket.colour.value)
+        if score_func == ScoreFunction.LOG:
+            reward_array = conditional_market.log_resolve(ball.value)
+        elif score_func == ScoreFunction.QUADRATIC:
+            reward_array = conditional_market.brier_resolve(ball.value)
+        else:
+            raise ValueError('The score function does not exist.')
+
+        return reward_array
+
+    def read_current_pred(self):
+        current_price_list = list(pm.current_prediction for pm in self.conditional_market_list)
+
+        return current_price_list
 
 
 class DecisionMarket:
@@ -205,7 +249,7 @@ class MultiBuckets:
         for no, prior_red in zip(range(bucket_num), prior_red_instances):
             self.bucket_list.append(Bucket(no, prior_red, pr_red_ball_red_bucket, pr_red_ball_blue_bucket))
 
-    def signal(self, size, t):
+    def signal(self, size):
 
         signal_mat = np.zeros(shape=(1, 3 * self.bucket_num))
         # Randomly select a bucket
@@ -362,7 +406,7 @@ def no_outlier_df(df, thresh=3):
     return df[(np.abs(stats.zscore(df)) < thresh).all(axis=1)]
 
 
-def signal_encode(ball_colour, bucket_no, prior_pair):
+def two_action_signal_encode(ball_colour, bucket_no, prior_pair):
     ball_col_val_map = {'red': 0, 'blue': 1}
     signal_mat = np.zeros((1, 6))
     signal_mat[0, [2, 5]] = np.squeeze(prior_pair)
@@ -370,19 +414,14 @@ def signal_encode(ball_colour, bucket_no, prior_pair):
 
     return signal_mat
 
+def two_action_signal_decode(signal_mat):
+    prior_pair = signal_mat[0, [2, 5]]
+    test_weights = np.array([1,2,0,3,4,0]).reshape((6,1))
+    result = np.squeeze(np.matmul(signal_mat.reshape(1, 6), test_weights))[()]
+    result_mapping ={1:(0, Ball.RED), 2:(0, Ball.BLUE), 3:(1, Ball.RED), 4:(1, Ball.BLUE)}
+    bucket_no, ball = result_mapping[result]
+    return ball, bucket_no, prior_pair
 
-def one_hot_encode(feature):
-    if feature == 'red':
-        return [1, 0]
-    else:
-        return [0, 1]
-
-
-def one_hot_decode(one_hot_feature):
-    if np.array_equal(one_hot_feature, [1, 0]):
-        return 'red'
-    else:
-        return 'blue'
 
 
 def gradients_box_plot(df, bins, col_name, color, ax):

@@ -57,13 +57,11 @@ for std in [0.3]:#[0.1, 0.3, 0.6, 0.9]:
     for i in range(test_times):
         print(f'Test {i}')
         agent_list = []
-        metric_dict = stochastic_training(
-                                     training_platform, agent_list, learning_rate_theta, learning_rate_wv,
-                                     memory_size, batch_size, training_episodes,
-                                     decay_rate, beta1, beta2, algorithm, learning_std,
-                                     fixed_std, pr_red_ball_red_bucket, pr_red_ball_blue_bucket,
-                                     prior_red_list, agent_num, action_num, score_func, decision_rule,
-                                     preferred_colour_pr_list, evaluation_step, weights_init, report_order, signal_size_list)
+        metric_dict = stochastic_training(training_platform, agent_list, learning_rate_theta, learning_rate_wv,
+                                          memory_size, batch_size, training_episodes, decay_rate, beta1, beta2,
+                                          algorithm, learning_std, fixed_std, pr_red_ball_red_bucket,
+                                          pr_red_ball_blue_bucket, prior_red_list, agent_num, action_num, score_func,
+                                          evaluation_step, weights_init, report_order, signal_size_list)
 
         sequence_number = 1
         parent_folder_name = 'Temp' # 'Deterministic' or 'Stochastic'

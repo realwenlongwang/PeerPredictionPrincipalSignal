@@ -1,5 +1,5 @@
 import numpy as np
-from scipy.special import logit, expit
+from scipy.special import softmax
 from scipy.ndimage import uniform_filter1d
 from Environment import *
 import matplotlib.pyplot as plt
@@ -12,14 +12,16 @@ def gaussian(x, mu, sigma):
 
 class Agent:
 
-    def __init__(self, feature_num, action_num, learning_rate_theta, name, algorithm=Algorithm.REGULAR, weights_init=WeightsInit.ZERO):
+    def __init__(self, feature_num, action_num, learning_rate_theta, learning_rate_wv, beta1, beta2, epsilon,
+                 batch_size, memory_size, name, algorithm=Algorithm.REGULAR, weights_init=WeightsInit.ZERO):
         if weights_init == WeightsInit.ZERO:
             self.theta_mean = np.zeros((feature_num * action_num, action_num))
         elif weights_init == WeightsInit.RANDOM:
             self.theta_mean = np.random.uniform(low=-1.0, high=1.0, size=(feature_num * action_num, action_num))
         elif weights_init == WeightsInit.CUSTOMISED:
-        # self.theta_mean = np.random.normal(0, np.sqrt(2/(feature_num * action_num)), (feature_num * action_num, action_num))
-            self.theta_mean = np.array([[0.0, -1.4], [0.0, -1.4], [0.0, 0.0], [-1.4, 0.0], [-1.4, 0.0], [0.0, 0.0]])
+            self.theta_mean = np.random.normal(0, np.sqrt(2 / (feature_num * action_num)),
+                                               (feature_num * action_num, action_num))
+            # self.theta_mean = np.array([[0.0, -1.4], [0.0, -1.4], [0.0, 0.0], [-1.4, 0.0], [-1.4, 0.0], [0.0, 0.0]])
         self.init_learning_rate_theta = learning_rate_theta
         self.learning_rate_theta = self.init_learning_rate_theta
         self.feature_num = feature_num
@@ -35,6 +37,23 @@ class Agent:
         self.reward_history_list = list()
         self.algorithm = algorithm
         self.name = name
+
+        # Baseline weights
+        self.w_v = np.zeros((feature_num * action_num, 1))
+        self.learning_rate_wv = learning_rate_wv
+
+        # Momentum variables
+        self.beta1 = beta1
+        self.v_dw_mean = np.zeros((feature_num * action_num, action_num))
+
+        # RMSprop variables
+        self.beta2 = beta2
+        self.epsilon = epsilon
+        self.s_dw_mean = np.zeros((feature_num * action_num, action_num))
+
+        # Experience replay
+        self.batch_size = batch_size
+        self.memory_size = memory_size
 
     def save_weights(self, file_name):
         np.save(file_name, self.theta_mean)
@@ -122,9 +141,9 @@ class Agent:
                                            xytext=(len(df) / 2, np.log(2) / 2), arrowprops=dict(arrowstyle="->"))
                 if bucket_no == title_no:
                     axs[bucket_no, 0].annotate('std:%.3f' % df.iloc[last_third_idx:, 0].std(),
-                                           xy=(len(df) * 0.8,
-                                               np.log(self.pr_red_ball_red_bucket / self.pr_red_ball_blue_bucket)),
-                                           xytext=(len(df) * 0.8, np.log(2) / 2), arrowprops=dict(arrowstyle="->"))
+                                               xy=(len(df) * 0.8,
+                                                   np.log(self.pr_red_ball_red_bucket / self.pr_red_ball_blue_bucket)),
+                                               xytext=(len(df) * 0.8, np.log(2) / 2), arrowprops=dict(arrowstyle="->"))
                 axs[bucket_no, 0].hlines(
                     y=np.log((1 - self.pr_red_ball_red_bucket) / (1 - self.pr_red_ball_blue_bucket)), xmin=0,
                     xmax=len(df), colors='blue',
@@ -135,9 +154,10 @@ class Agent:
                     xytext=(len(df) / 2, np.log(1 / 2) / 2), arrowprops=dict(arrowstyle="->"))
                 if bucket_no == title_no:
                     axs[bucket_no, 0].annotate(
-                    'std:%.3f' % df.iloc[last_third_idx:, 1].std(),
-                    xy=(len(df) * 0.8, np.log((1 - self.pr_red_ball_red_bucket) / (1 - self.pr_red_ball_blue_bucket))),
-                    xytext=(len(df) * 0.8, np.log(1 / 2) / 2), arrowprops=dict(arrowstyle="->"))
+                        'std:%.3f' % df.iloc[last_third_idx:, 1].std(),
+                        xy=(
+                        len(df) * 0.8, np.log((1 - self.pr_red_ball_red_bucket) / (1 - self.pr_red_ball_blue_bucket))),
+                        xytext=(len(df) * 0.8, np.log(1 / 2) / 2), arrowprops=dict(arrowstyle="->"))
                 axs[bucket_no, 0].hlines(y=1, xmin=0, xmax=len(df), colors='green', linestyles='dashdot')
                 axs[bucket_no, 0].hlines(y=0, xmin=0, xmax=len(df), colors='black', linestyles='dashdot')
                 axs[bucket_no, 0].legend(loc='upper left')
@@ -145,37 +165,29 @@ class Agent:
                 if dir_path is not None:
                     plt.savefig(dir_path + self.name + '_bucket' + str(title_no) + '_mean_weights.png')
 
+
 class StochasticGradientAgent(Agent):
 
     def __init__(self, feature_num, action_num, learning_rate_theta, learning_rate_wv, memory_size=512, batch_size=16,
                  beta1=0.9, beta2=0.999, epsilon=1e-8, learning_std=True, fixed_std=1.0, name='agent',
                  algorithm=Algorithm.REGULAR, weights_init=WeightsInit.ZERO):
         # Actor weights
-        super().__init__(feature_num, action_num, learning_rate_theta, name, algorithm, weights_init)
+        super().__init__(feature_num, action_num, learning_rate_theta, learning_rate_wv, beta1, beta2, epsilon,
+                         batch_size, memory_size, name, algorithm, weights_init)
 
         self.theta_std = np.zeros((feature_num * action_num, action_num))
         self.learning_std = learning_std
         self.fixed_std = fixed_std
         self.std_learning_rate_mask = np.ones((1, action_num))
-        # Baseline weights
-        self.w_v = np.zeros((feature_num * action_num, 1))
-        self.learning_rate_wv = learning_rate_wv
 
         # Momentum variables
-        self.beta1 = beta1
-        self.v_dw_mean = np.zeros((feature_num * action_num, action_num))
         self.v_dw_std = np.zeros((feature_num * action_num, action_num))
 
         # RMSprop variables
-        self.beta2 = beta2
-        self.epsilon = epsilon
-        self.s_dw_mean = np.zeros((feature_num * action_num, action_num))
         self.s_dw_std = np.zeros((feature_num * action_num, action_num))
 
         # Experience replay
         self.memory = np.zeros((memory_size, 1, (self.feature_num + 5) * self.action_num))
-        self.batch_size = batch_size
-        self.memory_size = memory_size
 
         # Evaluation
         self.std_weights_history_list = list([] for i in range(action_num))
@@ -206,7 +218,7 @@ class StochasticGradientAgent(Agent):
             std_string = str(self.fixed_std)
         print('memory_size=', self.memory_size, ' standard deviation=', std_string)
         print('Updating weights with ' + self.algorithm.value + ' algorithm.')
-        print('='*30)
+        print('=' * 30)
 
     def store_experience(self, t, signal_array, h_array, mean_array, std_array, reward):
 
@@ -225,19 +237,18 @@ class StochasticGradientAgent(Agent):
 
         if self.evaluating and (t % self.evaluation_step == 0):
             entry = {
-                    'bucket_0_red': signal_array[0, 0], 'bucket_0_blue': signal_array[0, 1],
-                    'bucket_0_prior': signal_array[0, 2], 'bucket_1_red': signal_array[0, 3],
-                    'bucket_1_blue': signal_array[0, 4], 'bucket_1_prior': signal_array[0, 5]
+                'bucket_0_red': signal_array[0, 0], 'bucket_0_blue': signal_array[0, 1],
+                'bucket_0_prior': signal_array[0, 2], 'bucket_1_red': signal_array[0, 3],
+                'bucket_1_blue': signal_array[0, 4], 'bucket_1_prior': signal_array[0, 5]
             }
             self.reward_history_list.append(entry)
             self.reward_history_list[-1][f'score'] = reward
             self.reward_history_list[-1][f'v'] = v
 
-        for bucket_no in range(self.action_num):
+            for bucket_no in range(self.action_num):
                 self.mean_weights_history_list[bucket_no].append(self.theta_mean[:, bucket_no].copy().ravel())
                 if self.learning_std:
                     self.std_weights_history_list[bucket_no].append(self.theta_std[:, bucket_no].copy().ravel())
-
 
     def __sample_experience(self, t):
 
@@ -270,7 +281,7 @@ class StochasticGradientAgent(Agent):
                  [(self.feature_num + 4) * self.action_num]]
 
         # prs = expit(hs)
-        batch_gradient_means = np.matmul(signal_array, deltas * ((hs - means) / np.power(stds, 2))) #* prs * (1 - prs)
+        batch_gradient_means = np.matmul(signal_array, deltas * ((hs - means) / np.power(stds, 2)))  # * prs * (1 - prs)
         # batch_gradient_means = np.matmul(signal_array, rewards * ((hs - means) / np.power(stds, 2)))  # * prs * (1 - prs)
         if self.learning_std:
             batch_gradient_stds = np.matmul(signal_array, deltas * (np.power(hs - means, 2) / np.power(stds, 2) - 1))
@@ -318,7 +329,6 @@ class StochasticGradientAgent(Agent):
         self.theta_mean += self.learning_rate_theta * gradient_mean
         if self.learning_std:
             self.theta_std += self.std_learning_rate_mask * self.learning_rate_theta * gradient_std
-
 
         self.w_v += self.learning_rate_wv * gradient_v
 
@@ -377,7 +387,8 @@ class StochasticGradientAgent(Agent):
                 ax.plot(report_history_df[column_name])
                 ax.annotate('%.3f' % report_history_df.loc[report_history_df.index[-1], column_name],
                             xy=(
-                            len(report_history_df), report_history_df.loc[report_history_df.index[-1], column_name]),
+                                len(report_history_df),
+                                report_history_df.loc[report_history_df.index[-1], column_name]),
                             xytext=(len(report_history_df), 0.5), arrowprops=dict(arrowstyle="->"))
                 # ax.legend(loc='lower left')
                 fig.suptitle(column_name)
@@ -447,29 +458,17 @@ class DeterministicGradientAgent(Agent):
                  learning_rate_wq, memory_size=512, batch_size=16, beta1=0.9,
                  beta2=0.999, epsilon=1e-8, name='agent', algorithm=Algorithm.REGULAR, weights_init=WeightsInit.ZERO):
         # Actor weights
-        super().__init__(feature_num, action_num, learning_rate_theta, name, algorithm, weights_init)
+        super().__init__(feature_num, action_num, learning_rate_theta, learning_rate_wv, beta1, beta2, epsilon,
+                         batch_size, memory_size, name, algorithm, weights_init)
 
         # Critic weights
         self.w_q = np.zeros((feature_num * action_num, action_num))
-        self.w_v = np.zeros((feature_num * action_num, 1))
-        self.learning_rate_wv = learning_rate_wv
         self.learning_rate_wq = learning_rate_wq
-
-        # Momentum variables
-        self.beta1 = beta1
-        self.v_dw_mean = np.zeros((feature_num * action_num, action_num))
-
-        # RMSprop variables
-        self.beta2 = beta2
-        self.epsilon = epsilon
-        self.s_dw_mean = np.zeros((feature_num * action_num, action_num))
 
         # Experience replay
         self.memory = np.zeros((memory_size, 1, (self.feature_num + 1) * self.action_num + 1))  # signal_array, action
         self.w_q_memory = np.zeros((memory_size, feature_num * action_num, action_num))
         self.phi_memory = np.zeros((memory_size, feature_num * action_num, action_num))
-        self.batch_size = batch_size
-        self.memory_size = memory_size
 
         # Evaluation
         self.q_gradients_history_list = list([] for i in range(action_num))
@@ -514,9 +513,9 @@ class DeterministicGradientAgent(Agent):
 
         if self.evaluating and (t % self.evaluation_step == 0):
             entry = {
-                    'bucket_0_red': signal_array[0, 0], 'bucket_0_blue': signal_array[0, 1],
-                    'bucket_0_prior': signal_array[0, 2], 'bucket_1_red': signal_array[0, 3],
-                    'bucket_1_blue': signal_array[0, 4], 'bucket_1_prior': signal_array[0, 5]
+                'bucket_0_red': signal_array[0, 0], 'bucket_0_blue': signal_array[0, 1],
+                'bucket_0_prior': signal_array[0, 2], 'bucket_1_red': signal_array[0, 3],
+                'bucket_1_blue': signal_array[0, 4], 'bucket_1_prior': signal_array[0, 5]
             }
             self.reward_history_list.append(entry)
             self.reward_history_list[-1][f'score'] = reward
@@ -748,3 +747,130 @@ class DeterministicGradientAgent(Agent):
                 axs[bucket_no, 0].hlines(y=0, xmin=0, xmax=len(df), colors='black', linestyles='dashdot')
                 axs[bucket_no, 0].legend(loc='upper left')
                 fig.suptitle('Bucket ' + str(title_no) + ' Mean Weights History')
+
+
+class PrincipalAgent(Agent):
+    def __init__(self, feature_num, action_num, learning_rate_theta, learning_rate_wv, learning_rate_principal,
+                 memory_size=512, batch_size=16, beta1=0.9, beta2=0.999, epsilon=1e-8, name='principal',
+                 algorithm=Algorithm.REGULAR, weights_init=WeightsInit.ZERO):
+        # Actor weights
+        super().__init__(feature_num, action_num, learning_rate_theta, learning_rate_wv, beta1, beta2, epsilon,
+                         batch_size, memory_size, name, algorithm, weights_init)
+
+        self.learning_rate_principal = learning_rate_principal
+
+        self.theta_std = np.zeros((feature_num * action_num, action_num))
+
+        # Experience replay
+        self.memory = np.zeros((memory_size, 1, (self.feature_num + 5) * self.action_num))
+
+        # Evaluation
+        self.std_weights_history_list = list([] for i in range(action_num))
+        self.std_gradients_history_list = list([] for i in range(action_num))
+
+        self.__print_info()
+
+    def __print_info(self):
+        print(self.name)
+        print('learning_rate_theta=', self.learning_rate_theta, ' learning_rate_wv=', self.learning_rate_wv)
+
+        print('memory_size=', self.memory_size)
+        print('Updating weights with ' + self.algorithm.value + ' algorithm.')
+        print('=' * 30)
+
+    def report(self, signal):
+        mean_array = np.matmul(signal, self.theta_mean)
+
+        action_prob_array = softmax(np.squeeze(mean_array))
+
+        arm = np.random.choice(list(range(self.action_num)), p=action_prob_array)
+
+        # Below is for calculating the gradients
+        zero_ones = np.zeros(self.action_num)
+        zero_ones[arm] = 1
+        grad_prob_array = zero_ones - action_prob_array
+
+        return arm, grad_prob_array
+
+    def store_experience(self, t, signal_array, grad_prob_array, reward):
+
+        v = np.squeeze(np.matmul(signal_array, self.w_v))[()]
+        delta = reward - v
+
+        idx = t % self.memory_size
+        self.memory[idx, 0, :self.feature_num * self.action_num] = signal_array
+        self.memory[idx, 0, self.feature_num * self.action_num:(self.feature_num + 1) * self.action_num] = grad_prob_array
+        self.memory[idx, 0, (self.feature_num + 1) * self.action_num] = delta
+
+        if self.evaluating and (t % self.evaluation_step == 0):
+            self.reward_history_list.append({})
+            for bucket_no in range(self.action_num):
+                for feature_name, row_idx in zip(['red', 'blue', 'prior'], range(3)):
+                    self.reward_history_list[-1][f'bucket_{bucket_no}_{feature_name}'] = signal_array[0, bucket_no * 3 + row_idx]
+            self.reward_history_list[-1]['score'] = reward
+            self.reward_history_list[-1]['v'] = v
+
+            for bucket_no in range(self.action_num):
+                self.mean_weights_history_list[bucket_no].append(self.theta_mean[:, bucket_no].copy().ravel())
+
+    def __sample_experience(self, t):
+
+        if t < self.batch_size:
+            return self.memory[:t + 1, :, :]
+        elif self.batch_size <= t < self.memory_size:
+            # idx = np.random.choice(t + 1, size=self.batch_size, replace=False)
+            idx = np.random.randint(low=0, high=t + 1, size=self.batch_size)  # with replacement but faster
+            return self.memory[idx, :, :]
+        else:
+            if self.batch_size == self.memory_size:
+                return self.memory
+            # idx = np.random.choice(self.memory_size, size=self.batch_size, replace=False)
+            idx = np.random.randint(self.memory_size, size=self.batch_size)  # with replacement but faster
+            return self.memory[idx, :, :]
+
+    # @profile
+    def batch_update(self, t):
+
+        experience_batch = self.__sample_experience(t)
+
+        signal_array = experience_batch[:, :, :self.feature_num * self.action_num].transpose((0, 2, 1))
+        grad_prob_array = experience_batch[:, :, self.feature_num * self.action_num:(self.feature_num + 1) * self.action_num]
+        deltas = experience_batch[:, :, [(self.feature_num + 1) * self.action_num]]
+
+        batch_gradient_means = np.matmul(signal_array, deltas * grad_prob_array)
+        batch_gradient_v = np.matmul(signal_array, deltas)
+
+        gradient_mean = np.mean(batch_gradient_means, axis=0, keepdims=False)
+        gradient_v = np.mean(batch_gradient_v, axis=0, keepdims=False)
+
+        # momentum update
+        if self.algorithm == Algorithm.MOMENTUM or self.algorithm == Algorithm.ADAM:
+            self.v_dw_mean = self.beta1 * self.v_dw_mean + (1 - self.beta1) * gradient_mean
+
+
+        # RMSprop update
+        if self.algorithm == Algorithm.ADAM:
+            self.s_dw_mean = self.beta2 * self.s_dw_mean + (1 - self.beta2) * (np.power(gradient_mean, 2))
+
+        # bias correction
+        if self.algorithm == Algorithm.MOMENTUM or self.algorithm == Algorithm.ADAM:
+            v_dw_mean_corrected = self.v_dw_mean / (1 - np.power(self.beta1, t + 1))
+            if self.algorithm == Algorithm.ADAM:
+                s_dw_mean_corrected = self.s_dw_mean / (1 - np.power(self.beta2, t + 1))
+
+        if self.algorithm == Algorithm.MOMENTUM:
+            gradient_mean = v_dw_mean_corrected
+
+        # Adam term
+        elif self.algorithm == Algorithm.ADAM:
+            gradient_mean = (v_dw_mean_corrected / (np.sqrt(s_dw_mean_corrected) + self.epsilon))
+
+        # update weights
+        self.theta_mean += self.learning_rate_principal * gradient_mean
+
+        self.w_v += self.learning_rate_principal * gradient_v
+
+        if self.evaluating and (t % self.evaluation_step == 0):
+            for bucket_no in range(self.action_num):
+                self.mean_gradients_history_list[bucket_no].append(gradient_mean[:, bucket_no].ravel())
+
