@@ -45,7 +45,7 @@ class ReportOrder(Enum):
     FIXED = 0
     RANDOM = 1
 
-def NaiveBayesOneIter(prior, signal, bucket_no, pr_rs_ru, pr_rs_bu):
+def BayesianUpdateConditionalProb(prior, signal, bucket_no, pr_rs_ru, pr_rs_bu):
     posterior = np.array(prior)
     if signal.name == 'RED':
         posterior[bucket_no] = prior[bucket_no] * pr_rs_ru / (
@@ -56,7 +56,7 @@ def NaiveBayesOneIter(prior, signal, bucket_no, pr_rs_ru, pr_rs_bu):
 
     return posterior
 
-def BayesianUpdateMat(signal_mat, pr_rs_ru, pr_rs_bu):
+def BayesianUpdateConditionalLogOdds(signal_mat, pr_rs_ru, pr_rs_bu):
     action_num = signal_mat.shape[1] // 3
     theta = np.zeros(shape=(3 * action_num, action_num))
     theta[np.arange(start=3 - 1, stop=3 * action_num, step=3), np.arange(action_num)] = 1
@@ -68,14 +68,9 @@ def BayesianUpdateMat(signal_mat, pr_rs_ru, pr_rs_bu):
     return logit_pos
 
 
-def BayesianPeerPrediction(prior, signal, bucket_no, pr_rs_ru, pr_rs_bu):
-    posterior = np.array(prior)
-    if signal.name == 'RED':
-        posterior[bucket_no] = prior[bucket_no] * pr_rs_ru + (1 - prior[bucket_no]) * pr_rs_bu
-    else:
-        posterior[bucket_no] = prior[bucket_no] * (1 - pr_rs_ru) + (1 - prior[bucket_no]) * (1 - pr_rs_bu)
-
-    return posterior
+def BayesianPeerPredictionProb(prior, pr_rs_ru, pr_rs_bu):
+    peer_posterior = prior * pr_rs_ru + (1 - prior) * pr_rs_bu
+    return peer_posterior
 
 class PredictionMarket:
 

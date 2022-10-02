@@ -85,8 +85,7 @@ def stochastic_iterative_policy(action_num, prior_red_list, pr_red_ball_red_buck
 
     ## The principal draws a ball from a random bucket.
     principal_signal_mat = buckets.signal(1)
-    ba_signal_mat = principal_signal_mat.copy()
-    logit_pos = pd.read_current_pred()
+    log_odds = pd.read_current_pred()
     for agent, signal_size in zip(agent_list, signal_size_list):
         signal_mat = buckets.signal(signal_size)
         current_predictions = pd.read_current_pred()
@@ -96,11 +95,11 @@ def stochastic_iterative_policy(action_num, prior_red_list, pr_red_ball_red_buck
         pd.report(h_array, mean_array)
         experience_list.append([t, signal_array.copy(), h_array.copy(), mean_array.copy(), std_array.copy()])
         ba_signal_mat = signal_mat.copy()
-        ba_signal_mat[0, prior_index] = logit_pos
-        logit_pos = BayesianUpdateMat(ba_signal_mat, pr_red_ball_red_bucket, pr_red_ball_blue_bucket)
+        ba_signal_mat[0, prior_index] = log_odds
+        log_odds = BayesianUpdateConditionalLogOdds(ba_signal_mat, pr_red_ball_red_bucket, pr_red_ball_blue_bucket)
 
-    ball, bucket_no, logit_prior = two_action_signal_decode(ba_signal_mat)
-    bayesian_peer_prediction = BayesianPeerPrediction(expit(logit_prior), ball, bucket_no, pr_red_ball_red_bucket, pr_red_ball_blue_bucket)
+    bayesian_peer_prediction = BayesianPeerPredictionProb(expit(log_odds), pr_red_ball_red_bucket,
+                                                          pr_red_ball_blue_bucket)
 
     reward_array = pd.resolve(score_func, principal_signal_mat)
 
@@ -130,11 +129,11 @@ def stochastic_iterative_policy(action_num, prior_red_list, pr_red_ball_red_buck
         tb = traceback.format_exc()
         print(tb)
     ba_signal_mat = principal_signal_mat.copy()
-    ba_signal_mat[0, prior_index] = logit_pos
-    logit_pos = BayesianUpdateMat(ba_signal_mat, pr_red_ball_red_bucket, pr_red_ball_blue_bucket)
+    ba_signal_mat[0, prior_index] = log_odds
+    log_odds = BayesianUpdateConditionalLogOdds(ba_signal_mat, pr_red_ball_red_bucket, pr_red_ball_blue_bucket)
 
     final_peer_prediction = expit(pd.read_current_pred())
-    bayesian_con_prediction = expit(logit_pos)
+    bayesian_con_prediction = expit(log_odds)
     loss = np.sqrt(np.mean(np.square(bayesian_peer_prediction - final_peer_prediction)))
     pd_outcome = buckets.bucket_list[arm].colour == BucketColour.RED
     # Evaluation_purpose:
@@ -248,7 +247,7 @@ def deterministic_iterative_policy(action_num, prior_red_list, pr_red_ball_red_b
         dm.report(e_h_array, mean_array)
         experience_list.append([t, signal_array, e_h_array, mean_array])
         signal_mat[0, prior_index] = logit_pos
-        logit_pos = BayesianUpdateMat(signal_mat, pr_red_ball_red_bucket, pr_red_ball_blue_bucket)
+        logit_pos = BayesianUpdateConditionalLogOdds(signal_mat, pr_red_ball_red_bucket, pr_red_ball_blue_bucket)
 
     rewards_array, arm = dm.resolve(score_func, buckets.bucket_list)
 
