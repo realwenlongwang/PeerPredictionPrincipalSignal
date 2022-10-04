@@ -350,9 +350,8 @@ for learning_rate_theta in [3e-5, 1e-4, 3e-4, 1e-3]:
                     signal_array = signal_encode(ball, bucket_i, prev_reports)
                     reports = context_weights_report(signal_array, weight_mat)
                     ba_signal_array = signal_encode(ball, bucket_i, prev_ba_reports)
-                    ba_reports = BayesianUpdateMat(ba_signal_array, pr_red_ball_red_bucket, pr_red_ball_blue_bucket)
-        #             ball, bucket_no, logit_prior = two_action_signal_decode(ba_reports)
-                    bayesian_peer_prediction = BayesianPeerPrediction(expit(ba_reports), pr_red_ball_red_bucket, pr_red_ball_blue_bucket)
+                    ba_reports = BayesianUpdateConditionalLogOdds(ba_signal_array, pr_red_ball_red_bucket, pr_red_ball_blue_bucket)
+                    bayesian_peer_prediction = BayesianPeerPredictionProb(expit(ba_reports), pr_red_ball_red_bucket, pr_red_ball_blue_bucket)
                     
                     axs[ag_i, bucket_i].scatter(expit(reports[0, 0]), expit(reports[0, 1]), marker='o', color=ball.name, label=f'{ball.name} DM')
                     axs[ag_i, bucket_i].scatter(bayesian_peer_prediction[0], bayesian_peer_prediction[1], marker='o', color=f'dark{ball.name}', label=f'{ball.name} Bayesian')
@@ -368,7 +367,7 @@ for learning_rate_theta in [3e-5, 1e-4, 3e-4, 1e-3]:
                     axs[-1, 0].set_ylabel('Report for Bucket 1', fontsize=15)
                     
                     prev_reports = reports.copy()
-                    prev_ba_reports = bayesian_peer_prediction.copy()
+                    prev_ba_reports = ba_reports.copy()
                     
         axs[0, 0].legend(loc='upper left', ncol=2, fontsize=10)            
         axs[0, 0].set_title('Signal from Bucket 0', fontsize=15)

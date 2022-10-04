@@ -303,7 +303,7 @@ if __name__ == '__main__':
     # Bucket parameters
     pr_red_ball_red_bucket = 2 / 3
     pr_red_ball_blue_bucket = 1 / 3
-    prior_red_list = logit([3 / 4, 1 / 4])
+    prior_red_list = logit(np.array([3 / 4, 1 / 4]))
     agent_num = 1
     action_num = 2
     preferred_colour_pr_list = [0.9, 0.1]
